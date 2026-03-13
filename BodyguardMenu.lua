@@ -2,20 +2,20 @@ dofile("C:/Users/GarnalG/Documents/Cherax/Lua/DannyScript/Natives/natives.lua")
 
 local bodyguards = {}
 
-local MODELS = {
-    { name = "s_m_m_security_01", label = "Security" },
-    { name = "s_m_m_fiboffice_01", label = "FIB" },
-    { name = "s_m_m_ciasec_01", label = "IAA / CIA Style" },
-    { name = "s_m_y_swat_01", label = "SWAT" },
-    { name = "s_m_y_blackops_01", label = "Black Ops" }
+local MODEL_OPTIONS = {
+    { label = "Security",        model = "s_m_m_security_01"  },
+    { label = "FIB",             model = "s_m_m_fiboffice_01" },
+    { label = "IAA / CIA Style", model = "s_m_m_ciasec_01"    },
+    { label = "SWAT",            model = "s_m_y_swat_01"      },
+    { label = "Black Ops",       model = "s_m_y_blackops_01"  }
 }
 
-local WEAPONS = {
-    { name = "WEAPON_PISTOL",        label = "Pistol",        ammo = 500  },
-    { name = "WEAPON_COMBATPISTOL",  label = "Combat Pistol", ammo = 500  },
-    { name = "WEAPON_SMG",           label = "SMG",           ammo = 800  },
-    { name = "WEAPON_CARBINERIFLE",  label = "Carbine Rifle", ammo = 1200 },
-    { name = "WEAPON_PUMPSHOTGUN",   label = "Pump Shotgun",  ammo = 300  }
+local WEAPON_OPTIONS = {
+    { label = "Pistol",        weapon = "WEAPON_PISTOL",       ammo = 500  },
+    { label = "Combat Pistol", weapon = "WEAPON_COMBATPISTOL", ammo = 500  },
+    { label = "SMG",           weapon = "WEAPON_SMG",          ammo = 800  },
+    { label = "Carbine Rifle", weapon = "WEAPON_CARBINERIFLE", ammo = 1200 },
+    { label = "Pump Shotgun",  weapon = "WEAPON_PUMPSHOTGUN",  ammo = 300  }
 }
 
 local FORMATIONS = {
@@ -23,6 +23,11 @@ local FORMATIONS = {
     { label = "Circle" },
     { label = "Around" }
 }
+
+local MODEL_LABELS = {}
+local WEAPON_LABELS = {}
+for i, v in ipairs(MODEL_OPTIONS) do MODEL_LABELS[i] = v.label end
+for i, v in ipairs(WEAPON_OPTIONS) do WEAPON_LABELS[i] = v.label end
 
 local currentModelIndex = 1
 local currentWeaponIndex = 1
@@ -32,6 +37,10 @@ local spawnAmount = 3
 local BLIP_COLOR = 5
 local BLIP_SPRITE = 1
 local BLIP_SCALE = 0.85
+
+local HASH_BG_MODEL_COMBO   = Utils.Joaat("BG_ModelCombo")
+local HASH_BG_WEAPON_COMBO  = Utils.Joaat("BG_WeaponCombo")
+local HASH_BG_AMOUNT_SLIDER = Utils.Joaat("BG_AmountSlider")
 
 local function info(text)
     Logger.Log(eLogColor.LIGHTGREEN, "Bodyguard Menu", text)
@@ -61,15 +70,42 @@ local function isToggled(hash)
 end
 
 local function currentModel()
-    return MODELS[currentModelIndex]
+    return MODEL_OPTIONS[currentModelIndex] or MODEL_OPTIONS[1]
 end
 
 local function currentWeapon()
-    return WEAPONS[currentWeaponIndex]
+    return WEAPON_OPTIONS[currentWeaponIndex] or WEAPON_OPTIONS[1]
 end
 
 local function currentFormation()
-    return FORMATIONS[currentFormationIndex]
+    return FORMATIONS[currentFormationIndex] or FORMATIONS[1]
+end
+
+local function syncModelIndexFromFeature(f)
+    local idx = safe(function() return f:GetListIndex() end)
+    if idx ~= nil then
+        currentModelIndex = idx + 1
+        if currentModelIndex < 1 then currentModelIndex = 1 end
+        if currentModelIndex > #MODEL_OPTIONS then currentModelIndex = #MODEL_OPTIONS end
+    end
+end
+
+local function syncWeaponIndexFromFeature(f)
+    local idx = safe(function() return f:GetListIndex() end)
+    if idx ~= nil then
+        currentWeaponIndex = idx + 1
+        if currentWeaponIndex < 1 then currentWeaponIndex = 1 end
+        if currentWeaponIndex > #WEAPON_OPTIONS then currentWeaponIndex = #WEAPON_OPTIONS end
+    end
+end
+
+local function syncSpawnAmountFromFeature(f)
+    local value = safe(function() return f:GetIntValue() end)
+    if value ~= nil then
+        spawnAmount = value
+        if spawnAmount < 1 then spawnAmount = 1 end
+        if spawnAmount > 20 then spawnAmount = 20 end
+    end
 end
 
 local function loadModel(modelHash)
@@ -172,7 +208,7 @@ end
 
 local function equipBodyguard(ped)
     local weaponInfo = currentWeapon()
-    local weaponHash = MISC.GET_HASH_KEY(weaponInfo.name)
+    local weaponHash = MISC.GET_HASH_KEY(weaponInfo.weapon)
 
     WEAPON.GIVE_WEAPON_TO_PED(ped, weaponHash, weaponInfo.ammo, false, true)
 
@@ -277,7 +313,7 @@ local function createBodyguard(offsetX, offsetY, offsetZ)
     local coords = ENTITY.GET_ENTITY_COORDS(playerPed, true)
     local modelInfo = currentModel()
     local weaponInfo = currentWeapon()
-    local modelHash = MISC.GET_HASH_KEY(modelInfo.name)
+    local modelHash = MISC.GET_HASH_KEY(modelInfo.model)
 
     if not STREAMING.IS_MODEL_IN_CDIMAGE(modelHash) then
         warn("Modèle absent du jeu")
@@ -454,38 +490,6 @@ local function deleteDeadOnly()
     info("Delete Dead Only terminé | Actifs: " .. tostring(bodyguardCount()))
 end
 
-local function nextModel()
-    currentModelIndex = currentModelIndex + 1
-    if currentModelIndex > #MODELS then
-        currentModelIndex = 1
-    end
-    info("Model: " .. currentModel().label)
-end
-
-local function previousModel()
-    currentModelIndex = currentModelIndex - 1
-    if currentModelIndex < 1 then
-        currentModelIndex = #MODELS
-    end
-    info("Model: " .. currentModel().label)
-end
-
-local function nextWeapon()
-    currentWeaponIndex = currentWeaponIndex + 1
-    if currentWeaponIndex > #WEAPONS then
-        currentWeaponIndex = 1
-    end
-    info("Weapon: " .. currentWeapon().label)
-end
-
-local function previousWeapon()
-    currentWeaponIndex = currentWeaponIndex - 1
-    if currentWeaponIndex < 1 then
-        currentWeaponIndex = #WEAPONS
-    end
-    info("Weapon: " .. currentWeapon().label)
-end
-
 local function nextFormation()
     currentFormationIndex = currentFormationIndex + 1
     if currentFormationIndex > #FORMATIONS then
@@ -504,21 +508,20 @@ local function previousFormation()
     applyFollowAll()
 end
 
-local function increaseAmount()
-    spawnAmount = spawnAmount + 1
-    if spawnAmount > 20 then
-        spawnAmount = 20
-    end
-    info("Spawn Amount: " .. tostring(spawnAmount))
-end
+FeatureMgr.AddFeature(HASH_BG_MODEL_COMBO, "Agent Model", eFeatureType.Combo, "Choisir le modèle du garde", function(f)
+    syncModelIndexFromFeature(f)
+    info("Model: " .. currentModel().label)
+end, true)
 
-local function decreaseAmount()
-    spawnAmount = spawnAmount - 1
-    if spawnAmount < 1 then
-        spawnAmount = 1
-    end
+FeatureMgr.AddFeature(HASH_BG_WEAPON_COMBO, "Primary Weapon", eFeatureType.Combo, "Choisir l'arme du garde", function(f)
+    syncWeaponIndexFromFeature(f)
+    info("Weapon: " .. currentWeapon().label)
+end, true)
+
+FeatureMgr.AddFeature(HASH_BG_AMOUNT_SLIDER, "Spawn Amount", eFeatureType.SliderInt, "Nombre de gardes à spawn", function(f)
+    syncSpawnAmountFromFeature(f)
     info("Spawn Amount: " .. tostring(spawnAmount))
-end
+end, true)
 
 FeatureMgr.AddFeature(Utils.Joaat("BG_GodMode"), "God Mode", eFeatureType.Toggle, "Invincibilité", function(f)
     refreshAll()
@@ -536,36 +539,12 @@ FeatureMgr.AddFeature(Utils.Joaat("BG_CombatMode"), "Combat Mode", eFeatureType.
     refreshAll()
 end, true)
 
-FeatureMgr.AddFeature(Utils.Joaat("BG_PreviousModel"), "Previous Model", eFeatureType.Button, "", function(f)
-    previousModel()
-end, true)
-
-FeatureMgr.AddFeature(Utils.Joaat("BG_NextModel"), "Next Model", eFeatureType.Button, "", function(f)
-    nextModel()
-end, true)
-
-FeatureMgr.AddFeature(Utils.Joaat("BG_PreviousWeapon"), "Previous Weapon", eFeatureType.Button, "", function(f)
-    previousWeapon()
-end, true)
-
-FeatureMgr.AddFeature(Utils.Joaat("BG_NextWeapon"), "Next Weapon", eFeatureType.Button, "", function(f)
-    nextWeapon()
-end, true)
-
 FeatureMgr.AddFeature(Utils.Joaat("BG_PreviousFormation"), "Previous Formation", eFeatureType.Button, "", function(f)
     previousFormation()
 end, true)
 
 FeatureMgr.AddFeature(Utils.Joaat("BG_NextFormation"), "Next Formation", eFeatureType.Button, "", function(f)
     nextFormation()
-end, true)
-
-FeatureMgr.AddFeature(Utils.Joaat("BG_AmountMinus"), "Amount -", eFeatureType.Button, "", function(f)
-    decreaseAmount()
-end, true)
-
-FeatureMgr.AddFeature(Utils.Joaat("BG_AmountPlus"), "Amount +", eFeatureType.Button, "", function(f)
-    increaseAmount()
 end, true)
 
 FeatureMgr.AddFeature(Utils.Joaat("BG_ShowSelection"), "Show Current Selection", eFeatureType.Button, "", function(f)
@@ -619,6 +598,26 @@ FeatureMgr.AddFeature(Utils.Joaat("BG_DeleteAll"), "Delete All", eFeatureType.Bu
     deleteAll()
 end, true)
 
+local modelCombo = getFeature(HASH_BG_MODEL_COMBO)
+if modelCombo then
+    modelCombo:SetList(MODEL_LABELS)
+    modelCombo:SetListIndex(0)
+end
+
+local weaponCombo = getFeature(HASH_BG_WEAPON_COMBO)
+if weaponCombo then
+    weaponCombo:SetList(WEAPON_LABELS)
+    weaponCombo:SetListIndex(0)
+end
+
+local amountSlider = getFeature(HASH_BG_AMOUNT_SLIDER)
+if amountSlider then
+    amountSlider:SetLimitValues(1, 20)
+    amountSlider:SetStepSize(1)
+    amountSlider:SetFormat("%d")
+    amountSlider:SetIntValue(3)
+end
+
 ClickGUI.AddTab("Bodyguard Menu", function()
 
     if ClickGUI.BeginCustomChildWindow("Command Center") then
@@ -630,14 +629,12 @@ ClickGUI.AddTab("Bodyguard Menu", function()
     end
 
     if ClickGUI.BeginCustomChildWindow("Identity") then
-        ClickGUI.RenderFeature(Utils.Joaat("BG_PreviousModel"))
-        ClickGUI.RenderFeature(Utils.Joaat("BG_NextModel"))
+        ClickGUI.RenderFeature(HASH_BG_MODEL_COMBO)
         ClickGUI.EndCustomChildWindow()
     end
 
     if ClickGUI.BeginCustomChildWindow("Arsenal") then
-        ClickGUI.RenderFeature(Utils.Joaat("BG_PreviousWeapon"))
-        ClickGUI.RenderFeature(Utils.Joaat("BG_NextWeapon"))
+        ClickGUI.RenderFeature(HASH_BG_WEAPON_COMBO)
         ClickGUI.EndCustomChildWindow()
     end
 
@@ -656,17 +653,16 @@ ClickGUI.AddTab("Bodyguard Menu", function()
     end
 
     if ClickGUI.BeginCustomChildWindow("Deployment") then
-        ClickGUI.RenderFeature(Utils.Joaat("BG_AmountMinus"))
-        ClickGUI.RenderFeature(Utils.Joaat("BG_AmountPlus"))
+        ClickGUI.RenderFeature(HASH_BG_AMOUNT_SLIDER)
         ClickGUI.RenderFeature(Utils.Joaat("BG_ShowAmount"))
         ClickGUI.RenderFeature(Utils.Joaat("BG_SpawnSelected"))
+        ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn1"))
+        ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn5"))
+        ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn10"))
         ClickGUI.EndCustomChildWindow()
     end
 
     if ClickGUI.BeginCustomChildWindow("Quick Actions") then
-        ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn1"))
-        ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn5"))
-        ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn10"))
         ClickGUI.RenderFeature(Utils.Joaat("BG_Teleport"))
         ClickGUI.EndCustomChildWindow()
     end
@@ -678,7 +674,7 @@ ClickGUI.AddTab("Bodyguard Menu", function()
     end
 end)
 
-info("Menu Bodyguard V7 chargé")
+info("Menu Bodyguard final chargé")
 info("Model: " .. currentModel().label)
 info("Weapon: " .. currentWeapon().label)
 info("Formation: " .. currentFormation().label)
