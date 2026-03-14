@@ -85,52 +85,52 @@ end
 ------------------------------------------------
 
 -- Combo pour choisir le modèle de garde
-FeatureMgr.AddFeature(HASH_BG_MODEL_COMBO, "Model", eFeatureType.Combo, "", function(f)
+FeatureMgr.AddFeature("Model", eFeatureType.Combo, "Model", function(f)
     local idx = f:GetListIndex()  -- Récupérer l'index sélectionné
     modelIndex = idx + 1
     info("Modèle de garde changé : " .. models[modelIndex])
-end, true)
+end)
 
 -- Combo pour choisir l'arme
-FeatureMgr.AddFeature(HASH_BG_WEAPON_COMBO, "Weapon", eFeatureType.Combo, "", function(f)
+FeatureMgr.AddFeature("Weapon", eFeatureType.Combo, "Weapon", function(f)
     local idx = f:GetListIndex()  -- Récupérer l'index sélectionné
     weaponIndex = idx + 1
     info("Arme choisie : " .. weapons[weaponIndex])
-end, true)
+end)
 
 -- Combo pour choisir si les bodyguards suivent ou non
-FeatureMgr.AddFeature(HASH_BG_FOLLOW_COMBO, "Follow Mode", eFeatureType.Combo, "", function(f)
+FeatureMgr.AddFeature("Follow Mode", eFeatureType.Combo, "Follow Mode", function(f)
     local idx = f:GetListIndex()  -- Récupérer l'index sélectionné
     toggleFollowMode(idx + 1)
-end, true)
+end)
 
 -- Spawn d'un bodyguard
-FeatureMgr.AddFeature(HASH_BG_SPAWN_BUTTON, "Spawn Bodyguard", eFeatureType.Button, "", function()
+FeatureMgr.AddFeature("Spawn Bodyguard", eFeatureType.Button, "Spawn Bodyguard", function()
     local x, y, z = GET_ENTITY_COORDS(PLAYER.PLAYER_PED_ID(), true)
     createBodyguard(x, y, z)
     info("Garde spawné à votre position")
-end, true)
+end)
 
 -- Supprimer tous les bodyguards
-FeatureMgr.AddFeature(HASH_BG_DELETE_ALL_BUTTON, "Delete All Bodyguards", eFeatureType.Button, "", function()
+FeatureMgr.AddFeature("Delete All Bodyguards", eFeatureType.Button, "Delete All Bodyguards", function()
     deleteAllBodyguards()
-end, true)
+end)
 
 -- Donner une arme à tous les bodyguards
-FeatureMgr.AddFeature(HASH_BG_GIVE_WEAPON, "Give Weapon to Bodyguards", eFeatureType.Button, "", function()
+FeatureMgr.AddFeature("Give Weapon to Bodyguards", eFeatureType.Button, "Give Weapon", function()
     giveWeaponToBodyguards(weaponIndex)
-end, true)
+end)
 
 -- Respawn des bodyguards morts
-FeatureMgr.AddFeature(HASH_BG_RESPAWN_BUTTON, "Respawn Dead Bodyguards", eFeatureType.Button, "", function()
+FeatureMgr.AddFeature("Respawn Dead Bodyguards", eFeatureType.Button, "Respawn Dead", function()
     respawnBodyguards()
-end, true)
+end)
 
 -- Slider pour ajuster le nombre de bodyguards
-FeatureMgr.AddFeature(HASH_BG_SLIDER, "Number of Bodyguards", eFeatureType.Slider, "", function(sliderValue)
+FeatureMgr.AddFeature("Number of Bodyguards", eFeatureType.Slider, "Number of Bodyguards", function(sliderValue)
     maxBodyguards = math.floor(sliderValue)
     info("Nombre de gardes défini à : " .. maxBodyguards)
-end, true)
+end)
 
 ------------------------------------------------
 --  Initialisation et Mise en place
