@@ -1212,3 +1212,27 @@ info("Weapon: " .. get_current_weapon().label)
 info("Formation: " .. get_current_formation().label)
 info("Behaviour: " .. get_current_behaviour().label)
 info("Spawn Amount: " .. tostring(spawnAmount))
+
+-- 12. Création du slider pour le nombre de gardes
+FeatureMgr.AddFeature(HASH_BG_SLIDER, "Number of Bodyguards", eFeatureType.Slider, "", function(sliderValue)
+    maxBodyguards = math.floor(sliderValue)
+    info("Nombre de gardes défini à : " .. maxBodyguards)
+end, true)
+
+-- 13. Définir la formation de garde
+FeatureMgr.AddFeature(HASH_BG_FORMATION_COMBO, "Formation", eFeatureType.Combo, "", function(f)
+    local idx = f:GetListIndex()
+    formationIndex = idx + 1
+    info("Formation de garde choisie : Formation " .. formationIndex)
+end, true)
+
+-- 14. Ajouter la section "Formation" et "AI"
+FeatureMgr.AddFeature(HASH_BG_TACTICAL, "Formation", eFeatureType.Button, "", function()
+    -- Activation de la formation
+    info("Formation activée pour les gardes")
+end, true)
+
+-- 15. Ajouter une option de suivi
+FeatureMgr.AddFeature(HASH_BG_AUTO_RESPAWN, "Auto Respawn", eFeatureType.Toggle, "", function()
+    info("Auto respawn activé pour les gardes")
+end, true)
