@@ -33,8 +33,14 @@ local BLIP_COLOR = 5
 local BLIP_SPRITE = 1
 local BLIP_SCALE = 0.85
 
-local function log(msg)
-    print("[Bodyguard Menu] " .. tostring(msg))
+local function toast(text)
+    Logger.Log(eLogColor.LIGHTGREEN, "Bodyguard Menu", text)
+    GUI.AddToast("Bodyguard Menu", text, 3000, eToastPos.TOP_RIGHT)
+end
+
+local function warn(text)
+    Logger.Log(eLogColor.LIGHTRED, "Bodyguard Menu", text)
+    GUI.AddToast("Bodyguard Menu", text, 4000, eToastPos.TOP_RIGHT)
 end
 
 local function get_feature(hash)
@@ -70,7 +76,7 @@ local function load_model(model)
     return STREAMING.HAS_MODEL_LOADED(model)
 end
 
-local function create_bodyguard_blip(ped)
+local function create_blip(ped)
     local blip = HUD.ADD_BLIP_FOR_ENTITY(ped)
 
     if blip ~= 0 then
@@ -81,7 +87,6 @@ local function create_bodyguard_blip(ped)
         HUD.SET_BLIP_AS_SHORT_RANGE(blip, false)
         HUD.SET_BLIP_DISPLAY(blip, 2)
         HUD.SET_BLIP_HIGH_DETAIL(blip, true)
-        HUD.SHOW_HEADING_INDICATOR_ON_BLIP(blip, true)
     end
 
     return blip
@@ -98,29 +103,11 @@ local function hide_blip(blip)
     end)
 end
 
-local function apply_blip_visibility(entry)
-    if entry == nil or entry.blip == nil or entry.blip == 0 then
-        return
-    end
-
-    local showBlips = is_feature_toggled(Utils.Joaat("BG_ShowBlips"))
-
-    pcall(function()
-        if showBlips then
-            HUD.SET_BLIP_DISPLAY(entry.blip, 2)
-            HUD.SET_BLIP_ALPHA(entry.blip, 255)
-        else
-            HUD.SET_BLIP_DISPLAY(entry.blip, 0)
-            HUD.SET_BLIP_ALPHA(entry.blip, 0)
-        end
-    end)
-end
-
 local function cleanup_bodyguards()
     local cleaned = {}
 
     for _, entry in pairs(bodyguards) do
-        if entry ~= nil and entry.ped ~= nil and entry.ped ~= 0 then
+        if entry and entry.ped and entry.ped ~= 0 then
             local ok, exists = pcall(function()
                 return ENTITY.DOES_ENTITY_EXIST(entry.ped)
             end)
@@ -128,7 +115,7 @@ local function cleanup_bodyguards()
             if ok and exists then
                 table.insert(cleaned, entry)
             else
-                if entry.blip ~= nil and entry.blip ~= 0 then
+                if entry.blip then
                     hide_blip(entry.blip)
                 end
             end
@@ -138,13 +125,27 @@ local function cleanup_bodyguards()
     bodyguards = cleaned
 end
 
-local function get_bodyguard_count()
+local function get_count()
     cleanup_bodyguards()
     return #bodyguards
 end
 
-local function print_bodyguard_count()
-    log("Bodyguards actifs: " .. tostring(get_bodyguard_count()))
+local function apply_blip_visibility(entry)
+    if not entry or not entry.blip or entry.blip == 0 then
+        return
+    end
+
+    local enabled = is_feature_toggled(Utils.Joaat("BG_ShowBlips"))
+
+    pcall(function()
+        if enabled then
+            HUD.SET_BLIP_DISPLAY(entry.blip, 2)
+            HUD.SET_BLIP_ALPHA(entry.blip, 255)
+        else
+            HUD.SET_BLIP_DISPLAY(entry.blip, 0)
+            HUD.SET_BLIP_ALPHA(entry.blip, 0)
+        end
+    end)
 end
 
 local function equip_bodyguard(ped)
@@ -165,8 +166,8 @@ local function equip_bodyguard(ped)
     end
 end
 
-local function follow_single_bodyguard(entry, index, total)
-    if entry == nil or entry.ped == nil or entry.ped == 0 then
+local function follow_single(entry, index, total)
+    if not entry or not entry.ped or entry.ped == 0 then
         return
     end
 
@@ -189,7 +190,7 @@ local function follow_single_bodyguard(entry, index, total)
         local angle = ((index - 1) / math.max(total, 1)) * 6.28318
         offX = math.cos(angle) * 3.0
         offY = math.sin(angle) * 3.0
-    elseif formation == "Around" then
+    else
         if index % 2 == 0 then
             offX = 2.0 + index * 0.2
         else
@@ -217,40 +218,33 @@ local function apply_follow_to_all()
     cleanup_bodyguards()
 
     for i, entry in ipairs(bodyguards) do
-        follow_single_bodyguard(entry, i, #bodyguards)
-    end
-
-    if is_feature_toggled(Utils.Joaat("BG_FollowPlayer")) then
-        log("Follow Player appliqué (" .. get_current_formation().label .. ")")
-    else
-        log("Follow Player désactivé")
+        follow_single(entry, i, #bodyguards)
     end
 end
 
-local function refresh_all_bodyguards()
+local function refresh_all()
     cleanup_bodyguards()
 
     for i, entry in ipairs(bodyguards) do
-        if entry ~= nil and entry.ped ~= nil and entry.ped ~= 0 then
-            local ped = entry.ped
+        if entry and entry.ped and entry.ped ~= 0 then
             pcall(function()
-                if ENTITY.DOES_ENTITY_EXIST(ped) then
-                    equip_bodyguard(ped)
+                if ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+                    equip_bodyguard(entry.ped)
                     apply_blip_visibility(entry)
                 end
             end)
-            follow_single_bodyguard(entry, i, #bodyguards)
+
+            follow_single(entry, i, #bodyguards)
         end
     end
 
-    log("Tous les bodyguards ont été refresh")
-    print_bodyguard_count()
+    toast("Refresh terminé | Actifs: " .. tostring(get_count()))
 end
 
 local function create_bodyguard(offsetX, offsetY, offsetZ)
     local playerPed = PLAYER.PLAYER_PED_ID()
     if playerPed == 0 then
-        log("PLAYER_PED_ID invalide")
+        warn("PLAYER_PED_ID invalide")
         return 0
     end
 
@@ -260,22 +254,22 @@ local function create_bodyguard(offsetX, offsetY, offsetZ)
     local modelHash = MISC.GET_HASH_KEY(modelInfo.name)
 
     if not STREAMING.IS_MODEL_IN_CDIMAGE(modelHash) then
-        log("Modèle absent du jeu")
+        warn("Modèle absent du jeu")
         return 0
     end
 
     if not STREAMING.IS_MODEL_VALID(modelHash) then
-        log("Modèle invalide")
+        warn("Modèle invalide")
         return 0
     end
 
     if not STREAMING.IS_MODEL_A_PED(modelHash) then
-        log("Le modèle n'est pas un ped")
+        warn("Le modèle n'est pas un ped")
         return 0
     end
 
     if not load_model(modelHash) then
-        log("Chargement du modèle échoué")
+        warn("Chargement du modèle échoué")
         return 0
     end
 
@@ -291,27 +285,21 @@ local function create_bodyguard(offsetX, offsetY, offsetZ)
     )
 
     if ped == 0 then
-        log("CREATE_PED a échoué")
+        warn("CREATE_PED a échoué")
         return 0
     end
 
     equip_bodyguard(ped)
 
-    local blip = create_bodyguard_blip(ped)
-
     local entry = {
         ped = ped,
-        blip = blip,
-        modelLabel = modelInfo.label,
-        weaponLabel = weaponInfo.label
+        blip = create_blip(ped)
     }
 
     table.insert(bodyguards, entry)
     apply_blip_visibility(entry)
 
-    log("Spawn: " .. modelInfo.label .. " | Arme: " .. weaponInfo.label)
-    print_bodyguard_count()
-
+    toast("Spawn: " .. modelInfo.label .. " | " .. weaponInfo.label)
     return ped
 end
 
@@ -326,9 +314,7 @@ local function spawn_amount_custom(amount)
         { -3.0,  0.0, 1.0 },
         {  4.0,  2.0, 1.0 },
         { -4.0,  2.0, 1.0 },
-        {  0.0,  3.0, 1.0 },
-        {  5.0, -1.0, 1.0 },
-        { -5.0, -1.0, 1.0 }
+        {  0.0,  3.0, 1.0 }
     }
 
     for i = 1, amount do
@@ -337,10 +323,10 @@ local function spawn_amount_custom(amount)
     end
 
     apply_follow_to_all()
-    log(tostring(amount) .. " bodyguards ont été spawn")
+    toast(tostring(amount) .. " bodyguards spawn")
 end
 
-local function teleport_all_bodyguards_to_me()
+local function teleport_all()
     local playerPed = PLAYER.PLAYER_PED_ID()
     if playerPed == 0 then
         return
@@ -350,30 +336,28 @@ local function teleport_all_bodyguards_to_me()
     cleanup_bodyguards()
 
     for i, entry in ipairs(bodyguards) do
-        if entry ~= nil and entry.ped ~= nil and entry.ped ~= 0 then
-            pcall(function()
-                if ENTITY.DOES_ENTITY_EXIST(entry.ped) then
-                    ENTITY.SET_ENTITY_COORDS(
-                        entry.ped,
-                        coords.x + (i * 1.2),
-                        coords.y + 1.5,
-                        coords.z,
-                        false,
-                        false,
-                        false,
-                        false
-                    )
-                end
-            end)
-        end
+        pcall(function()
+            if entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+                ENTITY.SET_ENTITY_COORDS(
+                    entry.ped,
+                    coords.x + (i * 1.2),
+                    coords.y + 1.5,
+                    coords.z,
+                    false,
+                    false,
+                    false,
+                    false
+                )
+            end
+        end)
     end
 
     apply_follow_to_all()
-    log("Tous les bodyguards ont été téléportés sur toi")
+    toast("Téléportation terminée")
 end
 
 local function kill_bodyguard(entry)
-    if entry == nil or entry.ped == nil or entry.ped == 0 then
+    if not entry or not entry.ped or entry.ped == 0 then
         return false
     end
 
@@ -386,17 +370,14 @@ local function kill_bodyguard(entry)
         end
     end)
 
-    if entry.blip ~= nil and entry.blip ~= 0 then
-        pcall(function()
-            HUD.SET_BLIP_DISPLAY(entry.blip, 0)
-            HUD.SET_BLIP_ALPHA(entry.blip, 0)
-        end)
+    if entry.blip then
+        hide_blip(entry.blip)
     end
 
     return ok
 end
 
-local function delete_all_bodyguards()
+local function delete_all()
     cleanup_bodyguards()
 
     for i = 1, #bodyguards do
@@ -404,9 +385,7 @@ local function delete_all_bodyguards()
     end
 
     bodyguards = {}
-
-    log("Tous les bodyguards ont été tués")
-    log("Bodyguards actifs: 0")
+    toast("Delete All terminé | Actifs: 0")
 end
 
 local function delete_dead_only()
@@ -417,7 +396,7 @@ local function delete_dead_only()
     for _, entry in ipairs(bodyguards) do
         local keep = true
 
-        if entry ~= nil and entry.ped ~= nil and entry.ped ~= 0 then
+        if entry and entry.ped and entry.ped ~= 0 then
             local ok, health = pcall(function()
                 if ENTITY.DOES_ENTITY_EXIST(entry.ped) then
                     return ENTITY.GET_ENTITY_HEALTH(entry.ped)
@@ -439,9 +418,7 @@ local function delete_dead_only()
     end
 
     bodyguards = cleaned
-
-    log("Bodyguards morts supprimés")
-    print_bodyguard_count()
+    toast("Delete Dead Only terminé | Actifs: " .. tostring(get_count()))
 end
 
 local function next_model()
@@ -449,7 +426,7 @@ local function next_model()
     if currentModelIndex > #MODELS then
         currentModelIndex = 1
     end
-    log("Modèle actuel: " .. get_current_model().label)
+    toast("Model: " .. get_current_model().label)
 end
 
 local function previous_model()
@@ -457,7 +434,7 @@ local function previous_model()
     if currentModelIndex < 1 then
         currentModelIndex = #MODELS
     end
-    log("Modèle actuel: " .. get_current_model().label)
+    toast("Model: " .. get_current_model().label)
 end
 
 local function next_weapon()
@@ -465,7 +442,7 @@ local function next_weapon()
     if currentWeaponIndex > #WEAPONS then
         currentWeaponIndex = 1
     end
-    log("Arme actuelle: " .. get_current_weapon().label)
+    toast("Weapon: " .. get_current_weapon().label)
 end
 
 local function previous_weapon()
@@ -473,7 +450,7 @@ local function previous_weapon()
     if currentWeaponIndex < 1 then
         currentWeaponIndex = #WEAPONS
     end
-    log("Arme actuelle: " .. get_current_weapon().label)
+    toast("Weapon: " .. get_current_weapon().label)
 end
 
 local function next_formation()
@@ -481,7 +458,7 @@ local function next_formation()
     if currentFormationIndex > #FORMATIONS then
         currentFormationIndex = 1
     end
-    log("Formation actuelle: " .. get_current_formation().label)
+    toast("Formation: " .. get_current_formation().label)
     apply_follow_to_all()
 end
 
@@ -490,7 +467,7 @@ local function previous_formation()
     if currentFormationIndex < 1 then
         currentFormationIndex = #FORMATIONS
     end
-    log("Formation actuelle: " .. get_current_formation().label)
+    toast("Formation: " .. get_current_formation().label)
     apply_follow_to_all()
 end
 
@@ -499,7 +476,7 @@ local function increase_amount()
     if spawnAmount > 20 then
         spawnAmount = 20
     end
-    log("Spawn Amount: " .. tostring(spawnAmount))
+    toast("Spawn Amount: " .. tostring(spawnAmount))
 end
 
 local function decrease_amount()
@@ -507,296 +484,103 @@ local function decrease_amount()
     if spawnAmount < 1 then
         spawnAmount = 1
     end
-    log("Spawn Amount: " .. tostring(spawnAmount))
+    toast("Spawn Amount: " .. tostring(spawnAmount))
 end
 
--- OPTIONS
+FeatureMgr.AddFeature(Utils.Joaat("BG_GodMode"), "God Mode", eFeatureType.Toggle, "Invincibilité", function(f)
+    refresh_all()
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_GodMode"),
-    "God Mode",
-    eFeatureType.Toggle,
-    "Invincibilité des bodyguards",
-    function(f)
-        refresh_all_bodyguards()
-        if f:IsToggled() then
-            log("God Mode activé")
-        else
-            log("God Mode désactivé")
-        end
-    end,
-    true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_ShowBlips"), "Show Blips", eFeatureType.Toggle, "Blips carte", function(f)
+    refresh_all()
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_ShowBlips"),
-    "Show Blips",
-    eFeatureType.Toggle,
-    "Afficher les blips",
-    function(f)
-        refresh_all_bodyguards()
-        if f:IsToggled() then
-            log("Blips activés")
-        else
-            log("Blips désactivés")
-        end
-    end,
-    true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_FollowPlayer"), "Follow Player", eFeatureType.Toggle, "Suivre le joueur", function(f)
+    apply_follow_to_all()
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_FollowPlayer"),
-    "Follow Player",
-    eFeatureType.Toggle,
-    "Faire suivre le joueur",
-    function(f)
+FeatureMgr.AddFeature(Utils.Joaat("BG_PreviousModel"), "Previous Model", eFeatureType.Button, "", function(f)
+    previous_model()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_NextModel"), "Next Model", eFeatureType.Button, "", function(f)
+    next_model()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_PreviousWeapon"), "Previous Weapon", eFeatureType.Button, "", function(f)
+    previous_weapon()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_NextWeapon"), "Next Weapon", eFeatureType.Button, "", function(f)
+    next_weapon()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_PreviousFormation"), "Previous Formation", eFeatureType.Button, "", function(f)
+    previous_formation()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_NextFormation"), "Next Formation", eFeatureType.Button, "", function(f)
+    next_formation()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_AmountMinus"), "Amount -", eFeatureType.Button, "", function(f)
+    decrease_amount()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_AmountPlus"), "Amount +", eFeatureType.Button, "", function(f)
+    increase_amount()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_ShowSelection"), "Show Current Selection", eFeatureType.Button, "", function(f)
+    toast("Model: " .. get_current_model().label .. " | Weapon: " .. get_current_weapon().label)
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_ShowFormation"), "Show Formation", eFeatureType.Button, "", function(f)
+    toast("Formation: " .. get_current_formation().label)
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_ShowAmount"), "Show Spawn Amount", eFeatureType.Button, "", function(f)
+    toast("Spawn Amount: " .. tostring(spawnAmount))
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_SpawnSelected"), "Spawn Selected Amount", eFeatureType.Button, "", function(f)
+    spawn_amount_custom(spawnAmount)
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_Spawn1"), "Spawn 1", eFeatureType.Button, "", function(f)
+    local ped = create_bodyguard(2.0, 2.0, 1.0)
+    if ped ~= 0 then
         apply_follow_to_all()
-        if f:IsToggled() then
-            log("Follow Player activé")
-        else
-            log("Follow Player désactivé")
-        end
-    end,
-    true
-)
+    end
+end, true)
 
--- LOADOUT
+FeatureMgr.AddFeature(Utils.Joaat("BG_Spawn5"), "Spawn 5", eFeatureType.Button, "", function(f)
+    spawn_amount_custom(5)
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_PreviousModel"),
-    "Previous Model",
-    eFeatureType.Button,
-    "Modèle précédent",
-    function(f)
-        previous_model()
-    end,
-    true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_Spawn10"), "Spawn 10", eFeatureType.Button, "", function(f)
+    spawn_amount_custom(10)
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_NextModel"),
-    "Next Model",
-    eFeatureType.Button,
-    "Modèle suivant",
-    function(f)
-        next_model()
-    end,
-    true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_Teleport"), "Teleport To Me", eFeatureType.Button, "", function(f)
+    teleport_all()
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_PreviousWeapon"),
-    "Previous Weapon",
-    eFeatureType.Button,
-    "Arme précédente",
-    function(f)
-        previous_weapon()
-    end,
-    true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_ShowCount"), "Show Count", eFeatureType.Button, "", function(f)
+    toast("Bodyguards actifs: " .. tostring(get_count()))
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_NextWeapon"),
-    "Next Weapon",
-    eFeatureType.Button,
-    "Arme suivante",
-    function(f)
-        next_weapon()
-    end,
-    true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_RefreshAll"), "Refresh All", eFeatureType.Button, "", function(f)
+    refresh_all()
+end, true)
 
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_ShowSelection"),
-    "Show Current Selection",
-    eFeatureType.Button,
-    "Afficher la sélection actuelle",
-    function(f)
-        log("Modèle: " .. get_current_model().label .. " | Arme: " .. get_current_weapon().label)
-    end,
-    true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_DeleteDeadOnly"), "Delete Dead Only", eFeatureType.Button, "", function(f)
+    delete_dead_only()
+end, true)
 
--- FORMATION
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_PreviousFormation"),
-    "Previous Formation",
-    eFeatureType.Button,
-    "Formation précédente",
-    function(f)
-        previous_formation()
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_NextFormation"),
-    "Next Formation",
-    eFeatureType.Button,
-    "Formation suivante",
-    function(f)
-        next_formation()
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_ShowFormation"),
-    "Show Formation",
-    eFeatureType.Button,
-    "Afficher la formation actuelle",
-    function(f)
-        log("Formation: " .. get_current_formation().label)
-    end,
-    true
-)
-
--- CUSTOM SPAWN
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_AmountMinus"),
-    "Amount -",
-    eFeatureType.Button,
-    "Diminuer le nombre",
-    function(f)
-        decrease_amount()
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_AmountPlus"),
-    "Amount +",
-    eFeatureType.Button,
-    "Augmenter le nombre",
-    function(f)
-        increase_amount()
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_ShowAmount"),
-    "Show Spawn Amount",
-    eFeatureType.Button,
-    "Afficher le nombre sélectionné",
-    function(f)
-        log("Spawn Amount: " .. tostring(spawnAmount))
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_SpawnSelected"),
-    "Spawn Selected Amount",
-    eFeatureType.Button,
-    "Spawn le nombre sélectionné",
-    function(f)
-        spawn_amount_custom(spawnAmount)
-    end,
-    true
-)
-
--- QUICK SPAWN
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_Spawn1"),
-    "Spawn 1",
-    eFeatureType.Button,
-    "Spawn 1 bodyguard",
-    function(f)
-        local ped = create_bodyguard(2.0, 2.0, 1.0)
-        if ped ~= 0 then
-            apply_follow_to_all()
-            log("1 bodyguard a été spawn")
-        end
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_Spawn5"),
-    "Spawn 5",
-    eFeatureType.Button,
-    "Spawn 5 bodyguards",
-    function(f)
-        spawn_amount_custom(5)
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_Spawn10"),
-    "Spawn 10",
-    eFeatureType.Button,
-    "Spawn 10 bodyguards",
-    function(f)
-        spawn_amount_custom(10)
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_Teleport"),
-    "Teleport To Me",
-    eFeatureType.Button,
-    "Téléporter tous les bodyguards",
-    function(f)
-        teleport_all_bodyguards_to_me()
-    end,
-    true
-)
-
--- OVERVIEW
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_ShowCount"),
-    "Show Count",
-    eFeatureType.Button,
-    "Afficher le nombre actif",
-    function(f)
-        print_bodyguard_count()
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_RefreshAll"),
-    "Refresh All",
-    eFeatureType.Button,
-    "Réappliquer les options",
-    function(f)
-        refresh_all_bodyguards()
-    end,
-    true
-)
-
--- CLEANUP
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_DeleteDeadOnly"),
-    "Delete Dead Only",
-    eFeatureType.Button,
-    "Supprimer les bodyguards morts",
-    function(f)
-        delete_dead_only()
-    end,
-    true
-)
-
-FeatureMgr.AddFeature(
-    Utils.Joaat("BG_DeleteAll"),
-    "Delete All",
-    eFeatureType.Button,
-    "Supprimer tous les bodyguards",
-    function(f)
-        delete_all_bodyguards()
-    end,
-    true
-)
-
--- MENU
+FeatureMgr.AddFeature(Utils.Joaat("BG_DeleteAll"), "Delete All", eFeatureType.Button, "", function(f)
+    delete_all()
+end, true)
 
 ClickGUI.AddTab("Bodyguard Menu", function()
     if ClickGUI.BeginCustomChildWindow("Overview") then
@@ -851,8 +635,8 @@ ClickGUI.AddTab("Bodyguard Menu", function()
     end
 end)
 
-log("Menu premium V4 chargé")
-log("Modèle actuel: " .. get_current_model().label)
-log("Arme actuelle: " .. get_current_weapon().label)
-log("Formation actuelle: " .. get_current_formation().label)
-log("Spawn Amount: " .. tostring(spawnAmount))
+toast("Menu Bodyguard chargé")
+toast("Model: " .. get_current_model().label)
+toast("Weapon: " .. get_current_weapon().label)
+toast("Formation: " .. get_current_formation().label)
+toast("Spawn Amount: " .. tostring(spawnAmount))
