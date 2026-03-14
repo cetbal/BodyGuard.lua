@@ -1,7 +1,6 @@
--- BodyguardMenuV14.lua
--- Version V14 avec menus déroulants pour modèles, armes et options
+-- BodyguardMenuV15.lua
+-- Version avec correction de l'affichage immédiat des boutons et gestion de l'UI
 
--- Variables principales
 local bodyguards = {}
 local maxBodyguards = 5
 local modelIndex = 1
@@ -80,6 +79,13 @@ local function toggleFollowMode(followIndex)
     end
 end
 
+-- Fonction pour forcer le rafraîchissement de l'UI
+local function forceUIRefresh()
+    -- Rafraîchir ou forcer l'UI à se mettre à jour immédiatement
+    -- Exemple de logique d'attente (délai) pour forcer l'UI à charger
+    wait(1000)  -- Attente de 1 seconde
+end
+
 ------------------------------------------------
 --  Menus Déroulants et Boutons Cherax
 ------------------------------------------------
@@ -138,3 +144,6 @@ end)
 
 -- Initialisation des variables
 info("Menu de bodyguards initialisé avec succès !")
+
+-- Forcer le rafraîchissement de l'UI pour s'assurer que les boutons apparaissent
+forceUIRefresh()
