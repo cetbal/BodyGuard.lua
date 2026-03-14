@@ -1,4 +1,4 @@
--- BodyguardMenuV15.lua
+-- MENU BODY OK.lua : version 14
 
 local bodyguards = {}
 local maxBodyguards = 5
@@ -6,6 +6,7 @@ local modelIndex = 1
 local weaponIndex = 1
 local respawnTime = 10  -- Temps en secondes pour respawn des gardes
 local followPlayer = true
+
 local models = {
     "s_m_m_security_01",  -- Security
     "s_m_m_fiboffice_01", -- FIB
@@ -13,6 +14,7 @@ local models = {
     "s_m_m_swat_01",      -- SWAT
     "s_m_m_blackops_01",  -- Black Ops
 }
+
 local weapons = {
     "WEAPON_PISTOL",
     "WEAPON_COMBATPISTOL",
@@ -20,6 +22,7 @@ local weapons = {
     "WEAPON_SMG",
     "WEAPON_HEAVYSHOTGUN",
 }
+
 local followMode = {
     "Suivre",
     "Ne pas suivre"
