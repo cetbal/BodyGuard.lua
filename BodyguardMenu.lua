@@ -476,6 +476,46 @@ local function teleportAll()
     info("Téléportation terminée")
 end
 
+local function teleportToVehicle()
+    local playerPed = PLAYER.PLAYER_PED_ID()
+    if playerPed == 0 then
+        return
+    end
+
+    if not PED.IS_PED_IN_ANY_VEHICLE(playerPed, false) then
+        warn("Tu n'es pas dans un véhicule")
+        return
+    end
+
+    local veh = PED.GET_VEHICLE_PED_IS_IN(playerPed, false)
+    local coords = ENTITY.GET_ENTITY_COORDS(veh, true)
+
+    cleanupBodyguards()
+
+    for i, entry in ipairs(bodyguards) do
+        local exists = safe(function()
+            return entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped)
+        end)
+
+        if exists then
+            safe(function()
+                ENTITY.SET_ENTITY_COORDS(
+                    entry.ped,
+                    coords.x + (i * 1.0),
+                    coords.y + 2.0,
+                    coords.z,
+                    false,
+                    false,
+                    false,
+                    false
+                )
+            end)
+        end
+    end
+
+    info("Téléportation au véhicule terminée")
+end
+
 local function killBodyguard(entry)
     if not entry or not entry.ped or entry.ped == 0 then
         return false
@@ -596,6 +636,34 @@ local function spawnInMyVehicle()
     end
 end
 
+local function putAllInMyVehicle()
+    local playerPed = PLAYER.PLAYER_PED_ID()
+    if playerPed == 0 then
+        return
+    end
+
+    if not PED.IS_PED_IN_ANY_VEHICLE(playerPed, false) then
+        warn("Tu n'es pas dans un véhicule")
+        return
+    end
+
+    local veh = PED.GET_VEHICLE_PED_IS_IN(playerPed, false)
+    local seat = 0
+
+    cleanupBodyguards()
+
+    for _, entry in ipairs(bodyguards) do
+        if entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+            safe(function()
+                PED.SET_PED_INTO_VEHICLE(entry.ped, veh, seat)
+            end)
+            seat = seat + 1
+        end
+    end
+
+    info("Bodyguards placés dans ton véhicule")
+end
+
 local function exitVehicleAll()
     cleanupBodyguards()
 
@@ -625,6 +693,18 @@ local function reviveMissing()
 
     spawnAmountCustom(missing)
     info("Revive de " .. tostring(missing) .. " bodyguards")
+end
+
+local function autoRespawnCheck()
+    if not autoRespawn then
+        return
+    end
+
+    cleanupBodyguards()
+
+    if bodyguardCount() < spawnAmount then
+        reviveMissing()
+    end
 end
 
 FeatureMgr.AddFeature(HASH_BG_MODEL_COMBO, "Agent Model", eFeatureType.Combo, "Choisir le modèle du garde", function(f)
@@ -726,8 +806,16 @@ FeatureMgr.AddFeature(Utils.Joaat("BG_SpawnVehicle"), "Spawn In My Vehicle", eFe
     spawnInMyVehicle()
 end, true)
 
+FeatureMgr.AddFeature(Utils.Joaat("BG_EnterVehicle"), "Enter My Vehicle", eFeatureType.Button, "", function(f)
+    putAllInMyVehicle()
+end, true)
+
 FeatureMgr.AddFeature(Utils.Joaat("BG_ExitVehicle"), "Exit Vehicle", eFeatureType.Button, "", function(f)
     exitVehicleAll()
+end, true)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_TeleportVehicle"), "Teleport To Vehicle", eFeatureType.Button, "", function(f)
+    teleportToVehicle()
 end, true)
 
 FeatureMgr.AddFeature(Utils.Joaat("BG_AttackNearby"), "Attack Nearby", eFeatureType.Button, "", function(f)
@@ -743,19 +831,12 @@ FeatureMgr.AddFeature(Utils.Joaat("BG_Teleport"), "Teleport To Me", eFeatureType
 end, true)
 
 FeatureMgr.AddFeature(Utils.Joaat("BG_ShowCount"), "Show Count", eFeatureType.Button, "", function(f)
-    cleanupBodyguards()
-
-    if autoRespawn and bodyguardCount() < spawnAmount then
-        reviveMissing()
-    else
-        info("Bodyguards actifs: " .. tostring(bodyguardCount()))
-    end
+    autoRespawnCheck()
+    info("Bodyguards actifs: " .. tostring(bodyguardCount()))
 end, true)
 
 FeatureMgr.AddFeature(Utils.Joaat("BG_RefreshAll"), "Refresh All", eFeatureType.Button, "", function(f)
-    if autoRespawn and bodyguardCount() < spawnAmount then
-        reviveMissing()
-    end
+    autoRespawnCheck()
     refreshAll()
 end, true)
 
@@ -865,10 +946,16 @@ ClickGUI.AddTab("Bodyguard Menu", function()
         ClickGUI.EndCustomChildWindow()
     end
 
+    if ClickGUI.BeginCustomChildWindow("Vehicle Support") then
+        ClickGUI.RenderFeature(Utils.Joaat("BG_SpawnVehicle"))
+        ClickGUI.RenderFeature(Utils.Joaat("BG_EnterVehicle"))
+        ClickGUI.RenderFeature(Utils.Joaat("BG_ExitVehicle"))
+        ClickGUI.RenderFeature(Utils.Joaat("BG_TeleportVehicle"))
+        ClickGUI.EndCustomChildWindow()
+    end
+
     if ClickGUI.BeginCustomChildWindow("Quick Actions") then
         ClickGUI.RenderFeature(Utils.Joaat("BG_Teleport"))
-        ClickGUI.RenderFeature(Utils.Joaat("BG_SpawnVehicle"))
-        ClickGUI.RenderFeature(Utils.Joaat("BG_ExitVehicle"))
         ClickGUI.RenderFeature(Utils.Joaat("BG_ReviveMissing"))
         ClickGUI.EndCustomChildWindow()
     end
@@ -880,7 +967,7 @@ ClickGUI.AddTab("Bodyguard Menu", function()
     end
 end)
 
-info("Menu Bodyguard V15 chargé")
+info("Menu Bodyguard V16 chargé")
 info("Model: " .. currentModel().label)
 info("Weapon: " .. currentWeapon().label)
 info("Formation: " .. currentFormation().label)
