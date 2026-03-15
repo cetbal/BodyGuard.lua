@@ -242,6 +242,23 @@ local function bodyguardCount()
     return #bodyguards
 end
 
+local function addBodyguardToPlayerGroup(ped)
+    local playerPed = PLAYER.PLAYER_PED_ID()
+    if playerPed == 0 or ped == 0 then
+        return
+    end
+
+    local groupIndex = safe(function()
+        return PED.GET_PED_GROUP_INDEX(playerPed)
+    end)
+
+    if groupIndex and groupIndex ~= 0 then
+        safe(function() PED.SET_PED_AS_GROUP_MEMBER(ped, groupIndex) end)
+        safe(function() PED.SET_PED_CAN_TELEPORT_TO_GROUP_LEADER(ped, groupIndex, true) end)
+        safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, true) end)
+    end
+end
+
 local function applyBlipState(entry)
     if not entry or not entry.blip or entry.blip == 0 then
         return
@@ -261,13 +278,14 @@ local function applyCombatMode(ped)
         return
     end
 
-    if isToggled(HASH_BG_COMBATMODE) then
+    if isToggled(HASH_BG_COMBATMODE) or protectPlayer then
         safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 2) end)
         safe(function() PED.SET_PED_COMBAT_RANGE(ped, 2) end)
         safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 2) end)
         safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 0, true) end)
-        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 46, true) end)
         safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 5, true) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 13, true) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 46, true) end)
         safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
     else
         safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 0) end)
@@ -281,12 +299,13 @@ local function equipBodyguard(ped)
     local weaponHash = MISC.GET_HASH_KEY(weaponInfo.weapon)
 
     WEAPON.GIVE_WEAPON_TO_PED(ped, weaponHash, weaponInfo.ammo, false, true)
+    safe(function() WEAPON.SET_CURRENT_PED_WEAPON(ped, weaponHash, true) end)
 
     safe(function() PED.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS(ped, true) end)
-    safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, true) end)
     safe(function() PED.SET_PED_CAN_SWITCH_WEAPON(ped, true) end)
     safe(function() PED.SET_PED_ACCURACY(ped, accuracy) end)
     safe(function() PED.SET_PED_ARMOUR(ped, armour) end)
+    safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
     safe(function() PED.SET_PED_RELATIONSHIP_GROUP_HASH(ped, MISC.GET_HASH_KEY("PLAYER")) end)
 
     if isToggled(HASH_BG_GODMODE) then
@@ -295,11 +314,12 @@ local function equipBodyguard(ped)
         ENTITY.SET_ENTITY_INVINCIBLE(ped, false)
     end
 
+    addBodyguardToPlayerGroup(ped)
     applyCombatMode(ped)
 
-    if isToggled(HASH_BG_COMBATMODE) then
+    if isToggled(HASH_BG_COMBATMODE) or protectPlayer then
         safe(function()
-            TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(ped, 100.0, 0)
+            TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(ped, 120.0, 0)
         end)
     end
 end
@@ -359,11 +379,7 @@ local function applyFollowOne(entry, index, total)
         )
     end)
 
-    if isToggled(HASH_BG_COMBATMODE) then
-        safe(function()
-            TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 100.0, 0)
-        end)
-    end
+    addBodyguardToPlayerGroup(entry.ped)
 end
 
 local function applyFollowAll()
@@ -387,6 +403,12 @@ local function refreshAll()
                 equipBodyguard(entry.ped)
                 applyBlipState(entry)
                 applyFollowOne(entry, i, #bodyguards)
+
+                if isToggled(HASH_BG_COMBATMODE) or protectPlayer then
+                    safe(function()
+                        TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 120.0, 0)
+                    end)
+                end
             end
         end
     end
@@ -443,6 +465,7 @@ local function createBodyguard(offsetX, offsetY, offsetZ)
     end
 
     equipBodyguard(ped)
+    addBodyguardToPlayerGroup(ped)
 
     local entry = {
         ped = ped,
@@ -451,6 +474,12 @@ local function createBodyguard(offsetX, offsetY, offsetZ)
 
     table.insert(bodyguards, entry)
     applyBlipState(entry)
+
+    if isToggled(HASH_BG_COMBATMODE) or protectPlayer then
+        safe(function()
+            TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(ped, 120.0, 0)
+        end)
+    end
 
     info("Spawn: " .. modelInfo.label .. " | " .. weaponInfo.label)
     return ped
@@ -645,7 +674,7 @@ local function attackNearby()
     for _, entry in ipairs(bodyguards) do
         if entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
             safe(function()
-                TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 80.0, 0)
+                TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 120.0, 0)
             end)
         end
     end
@@ -999,7 +1028,7 @@ ClickGUI.AddTab("Bodyguard Menu V16", function()
     end
 end)
 
-info("Menu Bodyguard V16 corrigé chargé")
+info("Menu Bodyguard V16 protection corrigée chargé")
 info("Model: " .. currentModel().label)
 info("Weapon: " .. currentWeapon().label)
 info("Formation: " .. currentFormation().label)
