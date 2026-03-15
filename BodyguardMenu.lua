@@ -25,64 +25,72 @@ local FORMATIONS = {
     { label = "Triangle" }
 }
 
+local BEHAVIOUR_OPTIONS = {
+    { label = "Passive"    },
+    { label = "Offensive"  },
+    { label = "Aggressive" }
+}
+
 local MODEL_LABELS = {}
 local WEAPON_LABELS = {}
+local BEHAVIOUR_LABELS = {}
 
 for i, v in ipairs(MODEL_OPTIONS) do MODEL_LABELS[i] = v.label end
 for i, v in ipairs(WEAPON_OPTIONS) do WEAPON_LABELS[i] = v.label end
+for i, v in ipairs(BEHAVIOUR_OPTIONS) do BEHAVIOUR_LABELS[i] = v.label end
 
 local currentModelIndex = 1
 local currentWeaponIndex = 1
 local currentFormationIndex = 1
+local currentBehaviourIndex = 2
 local spawnAmount = 3
 
 local accuracy = 75
 local armour = 100
 local followDistance = 3
-local protectPlayer = false
 local autoRespawn = false
 
 local BLIP_COLOR = 5
 local BLIP_SPRITE = 1
 local BLIP_SCALE = 0.85
 
-local HASH_BG_MODEL_COMBO      = Utils.Joaat("BGV16FIX_ModelCombo")
-local HASH_BG_WEAPON_COMBO     = Utils.Joaat("BGV16FIX_WeaponCombo")
-local HASH_BG_AMOUNT_SLIDER    = Utils.Joaat("BGV16FIX_AmountSlider")
-local HASH_BG_ACCURACY_SLIDER  = Utils.Joaat("BGV16FIX_AccuracySlider")
-local HASH_BG_ARMOUR_SLIDER    = Utils.Joaat("BGV16FIX_ArmourSlider")
-local HASH_BG_DISTANCE_SLIDER  = Utils.Joaat("BGV16FIX_DistanceSlider")
+local HASH_BG_MODEL_COMBO      = Utils.Joaat("BGV164_ModelCombo")
+local HASH_BG_WEAPON_COMBO     = Utils.Joaat("BGV164_WeaponCombo")
+local HASH_BG_BEHAVIOUR_COMBO  = Utils.Joaat("BGV164_BehaviourCombo")
+local HASH_BG_AMOUNT_SLIDER    = Utils.Joaat("BGV164_AmountSlider")
+local HASH_BG_ACCURACY_SLIDER  = Utils.Joaat("BGV164_AccuracySlider")
+local HASH_BG_ARMOUR_SLIDER    = Utils.Joaat("BGV164_ArmourSlider")
+local HASH_BG_DISTANCE_SLIDER  = Utils.Joaat("BGV164_DistanceSlider")
 
-local HASH_BG_GODMODE          = Utils.Joaat("BGV16FIX_GodMode")
-local HASH_BG_SHOWBLIPS        = Utils.Joaat("BGV16FIX_ShowBlips")
-local HASH_BG_FOLLOWPLAYER     = Utils.Joaat("BGV16FIX_FollowPlayer")
-local HASH_BG_COMBATMODE       = Utils.Joaat("BGV16FIX_CombatMode")
-local HASH_BG_PROTECTPLAYER    = Utils.Joaat("BGV16FIX_ProtectPlayer")
-local HASH_BG_AUTORESPAWN      = Utils.Joaat("BGV16FIX_AutoRespawn")
+local HASH_BG_GODMODE          = Utils.Joaat("BGV164_GodMode")
+local HASH_BG_SHOWBLIPS        = Utils.Joaat("BGV164_ShowBlips")
+local HASH_BG_FOLLOWPLAYER     = Utils.Joaat("BGV164_FollowPlayer")
+local HASH_BG_AUTORESPAWN      = Utils.Joaat("BGV164_AutoRespawn")
 
-local HASH_BG_PREVFORMATION    = Utils.Joaat("BGV16FIX_PreviousFormation")
-local HASH_BG_NEXTFORMATION    = Utils.Joaat("BGV16FIX_NextFormation")
-local HASH_BG_SHOWSELECTION    = Utils.Joaat("BGV16FIX_ShowSelection")
-local HASH_BG_SHOWFORMATION    = Utils.Joaat("BGV16FIX_ShowFormation")
-local HASH_BG_SHOWAMOUNT       = Utils.Joaat("BGV16FIX_ShowAmount")
+local HASH_BG_PREVFORMATION    = Utils.Joaat("BGV164_PreviousFormation")
+local HASH_BG_NEXTFORMATION    = Utils.Joaat("BGV164_NextFormation")
+local HASH_BG_SHOWSELECTION    = Utils.Joaat("BGV164_ShowSelection")
+local HASH_BG_SHOWFORMATION    = Utils.Joaat("BGV164_ShowFormation")
+local HASH_BG_SHOWAMOUNT       = Utils.Joaat("BGV164_ShowAmount")
+local HASH_BG_SHOWBEHAVIOUR    = Utils.Joaat("BGV164_ShowBehaviour")
 
-local HASH_BG_SPAWNSELECTED    = Utils.Joaat("BGV16FIX_SpawnSelected")
-local HASH_BG_SPAWN1           = Utils.Joaat("BGV16FIX_Spawn1")
-local HASH_BG_SPAWN5           = Utils.Joaat("BGV16FIX_Spawn5")
-local HASH_BG_SPAWN10          = Utils.Joaat("BGV16FIX_Spawn10")
+local HASH_BG_SPAWNSELECTED    = Utils.Joaat("BGV164_SpawnSelected")
+local HASH_BG_SPAWN1           = Utils.Joaat("BGV164_Spawn1")
+local HASH_BG_SPAWN5           = Utils.Joaat("BGV164_Spawn5")
+local HASH_BG_SPAWN10          = Utils.Joaat("BGV164_Spawn10")
 
-local HASH_BG_SPAWNVEHICLE     = Utils.Joaat("BGV16FIX_SpawnVehicle")
-local HASH_BG_ENTERVEHICLE     = Utils.Joaat("BGV16FIX_EnterVehicle")
-local HASH_BG_EXITVEHICLE      = Utils.Joaat("BGV16FIX_ExitVehicle")
-local HASH_BG_TPVEHICLE        = Utils.Joaat("BGV16FIX_TeleportVehicle")
-local HASH_BG_ATTACKNEARBY     = Utils.Joaat("BGV16FIX_AttackNearby")
-local HASH_BG_REVIVEMISSING    = Utils.Joaat("BGV16FIX_ReviveMissing")
-local HASH_BG_TPTO_ME          = Utils.Joaat("BGV16FIX_TeleportToMe")
+local HASH_BG_SPAWNVEHICLE     = Utils.Joaat("BGV164_SpawnVehicle")
+local HASH_BG_ENTERVEHICLE     = Utils.Joaat("BGV164_EnterVehicle")
+local HASH_BG_EXITVEHICLE      = Utils.Joaat("BGV164_ExitVehicle")
+local HASH_BG_TPVEHICLE        = Utils.Joaat("BGV164_TeleportVehicle")
+local HASH_BG_ATTACKNEARBY     = Utils.Joaat("BGV164_AttackNearby")
+local HASH_BG_REVIVEMISSING    = Utils.Joaat("BGV164_ReviveMissing")
+local HASH_BG_TPTO_ME          = Utils.Joaat("BGV164_TeleportToMe")
 
-local HASH_BG_SHOWCOUNT        = Utils.Joaat("BGV16FIX_ShowCount")
-local HASH_BG_REFRESHALL       = Utils.Joaat("BGV16FIX_RefreshAll")
-local HASH_BG_DELETEDEAD       = Utils.Joaat("BGV16FIX_DeleteDeadOnly")
-local HASH_BG_DELETEALL        = Utils.Joaat("BGV16FIX_DeleteAll")
+local HASH_BG_SHOWCOUNT        = Utils.Joaat("BGV164_ShowCount")
+local HASH_BG_REFRESHALL       = Utils.Joaat("BGV164_RefreshAll")
+local HASH_BG_DELETEDEAD       = Utils.Joaat("BGV164_DeleteDeadOnly")
+local HASH_BG_DELETEALL        = Utils.Joaat("BGV164_DeleteAll")
 
 local function info(text)
     Logger.Log(eLogColor.LIGHTGREEN, "Bodyguard Menu", text)
@@ -123,57 +131,56 @@ local function currentFormation()
     return FORMATIONS[currentFormationIndex] or FORMATIONS[1]
 end
 
+local function currentBehaviour()
+    return BEHAVIOUR_OPTIONS[currentBehaviourIndex] or BEHAVIOUR_OPTIONS[1]
+end
+
 local function syncModelIndexFromFeature(f)
     local idx = safe(function() return f:GetListIndex() end)
     if idx ~= nil then
-        currentModelIndex = idx + 1
-        if currentModelIndex < 1 then currentModelIndex = 1 end
-        if currentModelIndex > #MODEL_OPTIONS then currentModelIndex = #MODEL_OPTIONS end
+        currentModelIndex = math.max(1, math.min(#MODEL_OPTIONS, idx + 1))
     end
 end
 
 local function syncWeaponIndexFromFeature(f)
     local idx = safe(function() return f:GetListIndex() end)
     if idx ~= nil then
-        currentWeaponIndex = idx + 1
-        if currentWeaponIndex < 1 then currentWeaponIndex = 1 end
-        if currentWeaponIndex > #WEAPON_OPTIONS then currentWeaponIndex = #WEAPON_OPTIONS end
+        currentWeaponIndex = math.max(1, math.min(#WEAPON_OPTIONS, idx + 1))
+    end
+end
+
+local function syncBehaviourIndexFromFeature(f)
+    local idx = safe(function() return f:GetListIndex() end)
+    if idx ~= nil then
+        currentBehaviourIndex = math.max(1, math.min(#BEHAVIOUR_OPTIONS, idx + 1))
     end
 end
 
 local function syncSpawnAmountFromFeature(f)
     local value = safe(function() return f:GetIntValue() end)
     if value ~= nil then
-        spawnAmount = value
-        if spawnAmount < 1 then spawnAmount = 1 end
-        if spawnAmount > 20 then spawnAmount = 20 end
+        spawnAmount = math.max(1, math.min(20, value))
     end
 end
 
 local function syncAccuracyFromFeature(f)
     local value = safe(function() return f:GetIntValue() end)
     if value ~= nil then
-        accuracy = value
-        if accuracy < 1 then accuracy = 1 end
-        if accuracy > 100 then accuracy = 100 end
+        accuracy = math.max(1, math.min(100, value))
     end
 end
 
 local function syncArmourFromFeature(f)
     local value = safe(function() return f:GetIntValue() end)
     if value ~= nil then
-        armour = value
-        if armour < 0 then armour = 0 end
-        if armour > 100 then armour = 100 end
+        armour = math.max(0, math.min(100, value))
     end
 end
 
 local function syncDistanceFromFeature(f)
     local value = safe(function() return f:GetIntValue() end)
     if value ~= nil then
-        followDistance = value
-        if followDistance < 1 then followDistance = 1 end
-        if followDistance > 15 then followDistance = 15 end
+        followDistance = math.max(1, math.min(15, value))
     end
 end
 
@@ -273,24 +280,51 @@ local function applyBlipState(entry)
     end
 end
 
-local function applyCombatMode(ped)
+local function applyBehaviourToPed(ped)
     if not ped or ped == 0 then
         return
     end
 
-    if isToggled(HASH_BG_COMBATMODE) or protectPlayer then
+    local behaviour = currentBehaviour().label
+
+    if behaviour == "Passive" then
+        safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 0) end)
+        safe(function() PED.SET_PED_COMBAT_RANGE(ped, 0) end)
+        safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 0) end)
+
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 0, false) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 5, false) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 13, false) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 46, false) end)
+        safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
+
+        safe(function() TASK.CLEAR_PED_TASKS(ped) end)
+
+    elseif behaviour == "Offensive" then
         safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 2) end)
         safe(function() PED.SET_PED_COMBAT_RANGE(ped, 2) end)
         safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 2) end)
+
         safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 0, true) end)
         safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 5, true) end)
         safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 13, true) end)
         safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 46, true) end)
         safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
+
     else
-        safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 0) end)
-        safe(function() PED.SET_PED_COMBAT_RANGE(ped, 0) end)
-        safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 0) end)
+        safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 2) end)
+        safe(function() PED.SET_PED_COMBAT_RANGE(ped, 2) end)
+        safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 2) end)
+
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 0, true) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 5, true) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 13, true) end)
+        safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 46, true) end)
+        safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
+
+        safe(function()
+            TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(ped, 120.0, 0)
+        end)
     end
 end
 
@@ -306,7 +340,6 @@ local function equipBodyguard(ped)
     safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, true) end)
     safe(function() PED.SET_PED_ACCURACY(ped, accuracy) end)
     safe(function() PED.SET_PED_ARMOUR(ped, armour) end)
-
     safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
     safe(function() PED.SET_PED_RELATIONSHIP_GROUP_HASH(ped, MISC.GET_HASH_KEY("PLAYER")) end)
 
@@ -317,7 +350,7 @@ local function equipBodyguard(ped)
     end
 
     addBodyguardToPlayerGroup(ped)
-    applyCombatMode(ped)
+    applyBehaviourToPed(ped)
 end
 
 local function formationOffset(index, total)
@@ -363,19 +396,21 @@ local function applyFollowOne(entry, index, total)
 
     addBodyguardToPlayerGroup(entry.ped)
 
-    safe(function()
-        TASK.TASK_FOLLOW_TO_OFFSET_OF_ENTITY(
-            entry.ped,
-            playerPed,
-            offX,
-            offY,
-            offZ,
-            2.0,
-            -1,
-            3.0,
-            true
-        )
-    end)
+    if currentBehaviour().label ~= "Aggressive" then
+        safe(function()
+            TASK.TASK_FOLLOW_TO_OFFSET_OF_ENTITY(
+                entry.ped,
+                playerPed,
+                offX,
+                offY,
+                offZ,
+                2.0,
+                -1,
+                3.0,
+                true
+            )
+        end)
+    end
 end
 
 local function applyFollowAll()
@@ -386,33 +421,45 @@ local function applyFollowAll()
     end
 end
 
-local function protectPlayerTick()
-    if not protectPlayer then
-        return
-    end
-
+local function behaviourTick()
+    local behaviour = currentBehaviour().label
     local playerPed = PLAYER.PLAYER_PED_ID()
+
     if playerPed == 0 then
-        return
-    end
-
-    local playerInCombat = safe(function()
-        return PED.IS_PED_IN_COMBAT(playerPed, 0)
-    end)
-
-    if not playerInCombat then
         return
     end
 
     cleanupBodyguards()
 
-    for i, entry in ipairs(bodyguards) do
-        if entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
-            addBodyguardToPlayerGroup(entry.ped)
+    if behaviour == "Passive" then
+        return
+    end
 
-            safe(function()
-                TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 120.0, 0)
-            end)
+    if behaviour == "Offensive" then
+        local playerInCombat = safe(function()
+            return PED.IS_PED_IN_COMBAT(playerPed, 0)
+        end)
+
+        if not playerInCombat then
+            return
+        end
+
+        for _, entry in ipairs(bodyguards) do
+            if entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+                addBodyguardToPlayerGroup(entry.ped)
+
+                safe(function()
+                    TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 120.0, 0)
+                end)
+            end
+        end
+    else
+        for _, entry in ipairs(bodyguards) do
+            if entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+                safe(function()
+                    TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 120.0, 0)
+                end)
+            end
         end
     end
 end
@@ -430,12 +477,6 @@ local function refreshAll()
                 equipBodyguard(entry.ped)
                 applyBlipState(entry)
                 applyFollowOne(entry, i, #bodyguards)
-
-                if isToggled(HASH_BG_COMBATMODE) or protectPlayer then
-                    safe(function()
-                        TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(entry.ped, 120.0, 0)
-                    end)
-                end
             end
         end
     end
@@ -501,12 +542,6 @@ local function createBodyguard(offsetX, offsetY, offsetZ)
 
     table.insert(bodyguards, entry)
     applyBlipState(entry)
-
-    if isToggled(HASH_BG_COMBATMODE) or protectPlayer then
-        safe(function()
-            TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(ped, 120.0, 0)
-        end)
-    end
 
     info("Spawn: " .. modelInfo.label .. " | " .. weaponInfo.label)
     return ped
@@ -790,130 +825,131 @@ local function reviveMissing()
     info("Revive de " .. tostring(missing) .. " bodyguards")
 end
 
-FeatureMgr.AddFeature(HASH_BG_MODEL_COMBO, "V16Fix Agent Model", eFeatureType.Combo, "Choisir le modèle du garde", function(f)
+FeatureMgr.AddFeature(HASH_BG_MODEL_COMBO, "V164 Agent Model", eFeatureType.Combo, "Choisir le modèle du garde", function(f)
     syncModelIndexFromFeature(f)
     info("Model: " .. currentModel().label)
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_WEAPON_COMBO, "V16Fix Primary Weapon", eFeatureType.Combo, "Choisir l'arme du garde", function(f)
+FeatureMgr.AddFeature(HASH_BG_WEAPON_COMBO, "V164 Primary Weapon", eFeatureType.Combo, "Choisir l'arme du garde", function(f)
     syncWeaponIndexFromFeature(f)
     info("Weapon: " .. currentWeapon().label)
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_AMOUNT_SLIDER, "V16Fix Spawn Amount", eFeatureType.SliderInt, "Nombre de gardes à spawn", function(f)
+FeatureMgr.AddFeature(HASH_BG_BEHAVIOUR_COMBO, "V164 Behaviour", eFeatureType.Combo, "Passive / Offensive / Aggressive", function(f)
+    syncBehaviourIndexFromFeature(f)
+    refreshAll()
+    info("Behaviour: " .. currentBehaviour().label)
+end, true)
+
+FeatureMgr.AddFeature(HASH_BG_AMOUNT_SLIDER, "V164 Spawn Amount", eFeatureType.SliderInt, "Nombre de gardes à spawn", function(f)
     syncSpawnAmountFromFeature(f)
     info("Spawn Amount: " .. tostring(spawnAmount))
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_ACCURACY_SLIDER, "V16Fix Accuracy", eFeatureType.SliderInt, "Précision", function(f)
+FeatureMgr.AddFeature(HASH_BG_ACCURACY_SLIDER, "V164 Accuracy", eFeatureType.SliderInt, "Précision", function(f)
     syncAccuracyFromFeature(f)
     refreshAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_ARMOUR_SLIDER, "V16Fix Armour", eFeatureType.SliderInt, "Armure", function(f)
+FeatureMgr.AddFeature(HASH_BG_ARMOUR_SLIDER, "V164 Armour", eFeatureType.SliderInt, "Armure", function(f)
     syncArmourFromFeature(f)
     refreshAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_DISTANCE_SLIDER, "V16Fix Follow Distance", eFeatureType.SliderInt, "Distance", function(f)
+FeatureMgr.AddFeature(HASH_BG_DISTANCE_SLIDER, "V164 Follow Distance", eFeatureType.SliderInt, "Distance", function(f)
     syncDistanceFromFeature(f)
     applyFollowAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_GODMODE, "V16Fix God Mode", eFeatureType.Toggle, "Invincibilité", function(f)
+FeatureMgr.AddFeature(HASH_BG_GODMODE, "V164 God Mode", eFeatureType.Toggle, "Invincibilité", function(f)
     refreshAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SHOWBLIPS, "V16Fix Show Blips", eFeatureType.Toggle, "Blips carte", function(f)
+FeatureMgr.AddFeature(HASH_BG_SHOWBLIPS, "V164 Show Blips", eFeatureType.Toggle, "Blips carte", function(f)
     refreshAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_FOLLOWPLAYER, "V16Fix Follow Player", eFeatureType.Toggle, "Suivre le joueur", function(f)
+FeatureMgr.AddFeature(HASH_BG_FOLLOWPLAYER, "V164 Follow Player", eFeatureType.Toggle, "Suivre le joueur", function(f)
     applyFollowAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_COMBATMODE, "V16Fix Combat Mode", eFeatureType.Toggle, "Mode combat", function(f)
-    refreshAll()
-end, true)
-
-FeatureMgr.AddFeature(HASH_BG_PROTECTPLAYER, "V16Fix Protect Player", eFeatureType.Toggle, "Protection joueur", function(f)
-    protectPlayer = f:IsToggled()
-    refreshAll()
-end, true)
-
-FeatureMgr.AddFeature(HASH_BG_AUTORESPAWN, "V16Fix Auto Respawn", eFeatureType.Toggle, "Respawn auto", function(f)
+FeatureMgr.AddFeature(HASH_BG_AUTORESPAWN, "V164 Auto Respawn", eFeatureType.Toggle, "Respawn auto", function(f)
     autoRespawn = f:IsToggled()
     info("Auto Respawn: " .. (autoRespawn and "ON" or "OFF"))
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_PREVFORMATION, "V16Fix Previous Formation", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_PREVFORMATION, "V164 Previous Formation", eFeatureType.Button, "", function(f)
     previousFormation()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_NEXTFORMATION, "V16Fix Next Formation", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_NEXTFORMATION, "V164 Next Formation", eFeatureType.Button, "", function(f)
     nextFormation()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SHOWSELECTION, "V16Fix Show Current Selection", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SHOWSELECTION, "V164 Show Current Selection", eFeatureType.Button, "", function(f)
     info("Model: " .. currentModel().label .. " | Weapon: " .. currentWeapon().label)
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SHOWFORMATION, "V16Fix Show Formation", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SHOWFORMATION, "V164 Show Formation", eFeatureType.Button, "", function(f)
     info("Formation: " .. currentFormation().label)
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SHOWAMOUNT, "V16Fix Show Spawn Amount", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SHOWAMOUNT, "V164 Show Spawn Amount", eFeatureType.Button, "", function(f)
     info("Spawn Amount: " .. tostring(spawnAmount))
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SPAWNSELECTED, "V16Fix Spawn Selected Amount", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SHOWBEHAVIOUR, "V164 Show Behaviour", eFeatureType.Button, "", function(f)
+    info("Behaviour: " .. currentBehaviour().label)
+end, true)
+
+FeatureMgr.AddFeature(HASH_BG_SPAWNSELECTED, "V164 Spawn Selected Amount", eFeatureType.Button, "", function(f)
     spawnAmountCustom(spawnAmount)
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SPAWN1, "V16Fix Spawn 1", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SPAWN1, "V164 Spawn 1", eFeatureType.Button, "", function(f)
     local ped = createBodyguard(2.0, 2.0, 1.0)
     if ped ~= 0 then
         applyFollowAll()
     end
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SPAWN5, "V16Fix Spawn 5", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SPAWN5, "V164 Spawn 5", eFeatureType.Button, "", function(f)
     spawnAmountCustom(5)
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SPAWN10, "V16Fix Spawn 10", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SPAWN10, "V164 Spawn 10", eFeatureType.Button, "", function(f)
     spawnAmountCustom(10)
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SPAWNVEHICLE, "V16Fix Spawn In My Vehicle", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SPAWNVEHICLE, "V164 Spawn In My Vehicle", eFeatureType.Button, "", function(f)
     spawnInMyVehicle()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_ENTERVEHICLE, "V16Fix Enter My Vehicle", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_ENTERVEHICLE, "V164 Enter My Vehicle", eFeatureType.Button, "", function(f)
     putAllInMyVehicle()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_EXITVEHICLE, "V16Fix Exit Vehicle", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_EXITVEHICLE, "V164 Exit Vehicle", eFeatureType.Button, "", function(f)
     exitVehicleAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_TPVEHICLE, "V16Fix Teleport To Vehicle", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_TPVEHICLE, "V164 Teleport To Vehicle", eFeatureType.Button, "", function(f)
     teleportToVehicle()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_ATTACKNEARBY, "V16Fix Attack Nearby", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_ATTACKNEARBY, "V164 Attack Nearby", eFeatureType.Button, "", function(f)
     attackNearby()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_REVIVEMISSING, "V16Fix Revive Missing", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_REVIVEMISSING, "V164 Revive Missing", eFeatureType.Button, "", function(f)
     reviveMissing()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_TPTO_ME, "V16Fix Teleport To Me", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_TPTO_ME, "V164 Teleport To Me", eFeatureType.Button, "", function(f)
     teleportAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_SHOWCOUNT, "V16Fix Show Count", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_SHOWCOUNT, "V164 Show Count", eFeatureType.Button, "", function(f)
     if autoRespawn and bodyguardCount() < spawnAmount then
         reviveMissing()
     else
@@ -921,18 +957,18 @@ FeatureMgr.AddFeature(HASH_BG_SHOWCOUNT, "V16Fix Show Count", eFeatureType.Butto
     end
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_REFRESHALL, "V16Fix Refresh All", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_REFRESHALL, "V164 Refresh All", eFeatureType.Button, "", function(f)
     if autoRespawn and bodyguardCount() < spawnAmount then
         reviveMissing()
     end
     refreshAll()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_DELETEDEAD, "V16Fix Delete Dead Only", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_DELETEDEAD, "V164 Delete Dead Only", eFeatureType.Button, "", function(f)
     deleteDeadOnly()
 end, true)
 
-FeatureMgr.AddFeature(HASH_BG_DELETEALL, "V16Fix Delete All", eFeatureType.Button, "", function(f)
+FeatureMgr.AddFeature(HASH_BG_DELETEALL, "V164 Delete All", eFeatureType.Button, "", function(f)
     deleteAll()
 end, true)
 
@@ -946,6 +982,12 @@ local weaponCombo = getFeature(HASH_BG_WEAPON_COMBO)
 if weaponCombo then
     weaponCombo:SetList(WEAPON_LABELS)
     weaponCombo:SetListIndex(0)
+end
+
+local behaviourCombo = getFeature(HASH_BG_BEHAVIOUR_COMBO)
+if behaviourCombo then
+    behaviourCombo:SetList(BEHAVIOUR_LABELS)
+    behaviourCombo:SetListIndex(1)
 end
 
 local amountSlider = getFeature(HASH_BG_AMOUNT_SLIDER)
@@ -980,13 +1022,14 @@ if distanceSlider then
     distanceSlider:SetIntValue(3)
 end
 
-ClickGUI.AddTab("Bodyguard Menu V16 Fix", function()
+ClickGUI.AddTab("Bodyguard Menu V164", function()
 
-    protectPlayerTick()
+    behaviourTick()
 
     if ClickGUI.BeginCustomChildWindow("Command Center") then
         ClickGUI.RenderFeature(HASH_BG_SHOWSELECTION)
         ClickGUI.RenderFeature(HASH_BG_SHOWFORMATION)
+        ClickGUI.RenderFeature(HASH_BG_SHOWBEHAVIOUR)
         ClickGUI.RenderFeature(HASH_BG_SHOWCOUNT)
         ClickGUI.RenderFeature(HASH_BG_REFRESHALL)
         ClickGUI.EndCustomChildWindow()
@@ -1002,10 +1045,9 @@ ClickGUI.AddTab("Bodyguard Menu V16 Fix", function()
         ClickGUI.EndCustomChildWindow()
     end
 
-    if ClickGUI.BeginCustomChildWindow("Formation & AI") then
+    if ClickGUI.BeginCustomChildWindow("Behaviour & Formation") then
+        ClickGUI.RenderFeature(HASH_BG_BEHAVIOUR_COMBO)
         ClickGUI.RenderFeature(HASH_BG_FOLLOWPLAYER)
-        ClickGUI.RenderFeature(HASH_BG_COMBATMODE)
-        ClickGUI.RenderFeature(HASH_BG_PROTECTPLAYER)
         ClickGUI.RenderFeature(HASH_BG_PREVFORMATION)
         ClickGUI.RenderFeature(HASH_BG_NEXTFORMATION)
         ClickGUI.RenderFeature(HASH_BG_DISTANCE_SLIDER)
@@ -1057,8 +1099,9 @@ ClickGUI.AddTab("Bodyguard Menu V16 Fix", function()
     end
 end)
 
-info("Menu Bodyguard V16 fix protection chargé")
+info("Menu Bodyguard V164 chargé")
 info("Model: " .. currentModel().label)
 info("Weapon: " .. currentWeapon().label)
+info("Behaviour: " .. currentBehaviour().label)
 info("Formation: " .. currentFormation().label)
 info("Spawn Amount: " .. tostring(spawnAmount))
