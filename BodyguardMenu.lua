@@ -1,114 +1,201 @@
-dofile("C:/Users/GarnalG/Documents/Cherax/Lua/DannyScript/Natives/natives.lua")
+------------------------------------------------
+-- Bodyguard Menu V15 Stable (Cherax)
+------------------------------------------------
+
+print("[Bodyguard] Script loaded")
 
 local bodyguards = {}
 
+local selectedModel = "s_m_y_blackops_01"
+local selectedWeapon = "weapon_carbinerifle"
+
+local spawnAmount = 3
+
+local accuracy = 75
+local armour = 100
+local followDistance = 2.0
+
+local autoRespawn = false
+local protectPlayer = false
+
 ------------------------------------------------
--- OPTIONS
+-- MODELS
 ------------------------------------------------
 
-local MODELS = {
-    {label="Security", model="s_m_m_security_01"},
-    {label="FIB", model="s_m_m_fiboffice_01"},
-    {label="CIA", model="s_m_m_ciasec_01"},
-    {label="SWAT", model="s_m_y_swat_01"},
-    {label="Black Ops", model="s_m_y_blackops_01"}
+local models = {
+"s_m_y_blackops_01",
+"s_m_m_security_01",
+"s_m_m_fibsec_01",
+"s_m_m_ciasec_01",
+"s_m_y_swat_01"
 }
 
-local WEAPONS = {
-    {label="Pistol", weapon="WEAPON_PISTOL", ammo=500},
-    {label="Combat Pistol", weapon="WEAPON_COMBATPISTOL", ammo=500},
-    {label="SMG", weapon="WEAPON_SMG", ammo=800},
-    {label="Carbine Rifle", weapon="WEAPON_CARBINERIFLE", ammo=1200}
+------------------------------------------------
+-- WEAPONS
+------------------------------------------------
+
+local weapons = {
+"weapon_pistol",
+"weapon_carbinerifle",
+"weapon_assaultrifle",
+"weapon_specialcarbine",
+"weapon_smg"
 }
-
-local MODEL_LABELS={}
-local WEAPON_LABELS={}
-
-for i,v in ipairs(MODELS) do MODEL_LABELS[i]=v.label end
-for i,v in ipairs(WEAPONS) do WEAPON_LABELS[i]=v.label end
-
-local currentModel=1
-local currentWeapon=1
-local spawnAmount=3
-
-------------------------------------------------
--- HASHES
-------------------------------------------------
-
-local HASH_MODEL=Utils.Joaat("BG_Model")
-local HASH_WEAPON=Utils.Joaat("BG_Weapon")
-local HASH_AMOUNT=Utils.Joaat("BG_Amount")
 
 ------------------------------------------------
 -- UTILS
 ------------------------------------------------
 
-local function info(t)
-Logger.Log(eLogColor.LIGHTGREEN,"Bodyguard",t)
-GUI.AddToast("Bodyguard",t,2500,eToastPos.TOP_RIGHT)
+local function notify(msg)
+    print("[Bodyguard] "..msg)
 end
 
-local function loadModel(hash)
-STREAMING.REQUEST_MODEL(hash)
+local function requestModel(hash)
 
-local i=0
-while not STREAMING.HAS_MODEL_LOADED(hash) and i<200 do
-SYSTEM.WAIT(0)
-i=i+1
+    STREAMING.REQUEST_MODEL(hash)
+
+    local timeout = 0
+
+    while not STREAMING.HAS_MODEL_LOADED(hash) and timeout < 100 do
+        SYSTEM.WAIT(10)
+        timeout = timeout + 1
+    end
+
+    return STREAMING.HAS_MODEL_LOADED(hash)
+
 end
 
-return STREAMING.HAS_MODEL_LOADED(hash)
+------------------------------------------------
+-- EQUIP
+------------------------------------------------
+
+local function equipBodyguard(ped)
+
+    WEAPON.GIVE_WEAPON_TO_PED(ped,Utils.Joaat(selectedWeapon),9999,false,true)
+
+    PED.SET_PED_ACCURACY(ped,accuracy)
+    PED.SET_PED_ARMOUR(ped,armour)
+
+    PED.SET_PED_COMBAT_ABILITY(ped,2)
+    PED.SET_PED_COMBAT_RANGE(ped,2)
+
+    PED.SET_PED_COMBAT_ATTRIBUTES(ped,46,true)
+
+    if protectPlayer then
+        PED.SET_PED_COMBAT_ATTRIBUTES(ped,5,true)
+    end
+
+end
+
+------------------------------------------------
+-- FOLLOW
+------------------------------------------------
+
+local function applyFollow(ped)
+
+    local player = PLAYER.PLAYER_PED_ID()
+
+    TASK.TASK_FOLLOW_TO_OFFSET_OF_ENTITY(
+        ped,
+        player,
+        math.random(-followDistance,followDistance),
+        math.random(-followDistance,followDistance),
+        0,
+        2.0,
+        -1,
+        1.0,
+        true
+    )
+
+end
+
+local function applyFollowAll()
+
+    for i,entry in pairs(bodyguards) do
+
+        if entry and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+            applyFollow(entry.ped)
+        end
+
+    end
+
 end
 
 ------------------------------------------------
 -- SPAWN
 ------------------------------------------------
 
-local function spawnOne(x,y,z)
+local function spawnBodyguard()
 
-local model=MODELS[currentModel]
-local weapon=WEAPONS[currentWeapon]
+    local player = PLAYER.PLAYER_PED_ID()
 
-local hash=MISC.GET_HASH_KEY(model.model)
+    local coords = ENTITY.GET_ENTITY_COORDS(player,true)
 
-if not loadModel(hash) then
-info("Model load failed")
-return
+    local modelHash = Utils.Joaat(selectedModel)
+
+    if not requestModel(modelHash) then
+        notify("Model failed to load")
+        return
+    end
+
+    local ped = PED.CREATE_PED(
+        4,
+        modelHash,
+        coords.x + math.random(-2,2),
+        coords.y + math.random(-2,2),
+        coords.z,
+        0,
+        true,
+        true
+    )
+
+    if ped == 0 then
+        notify("CreatePed failed")
+        return
+    end
+
+    equipBodyguard(ped)
+
+    applyFollow(ped)
+
+    table.insert(bodyguards,{ped=ped})
+
 end
 
-local ped=PED.CREATE_PED(4,hash,x,y,z,0,false,false)
+------------------------------------------------
+-- SPAWN AMOUNT
+------------------------------------------------
 
-WEAPON.GIVE_WEAPON_TO_PED(
-ped,
-MISC.GET_HASH_KEY(weapon.weapon),
-weapon.ammo,
-false,
-true
-)
+local function spawnAmountCustom(n)
 
-PED.SET_PED_AS_GROUP_MEMBER(
-ped,
-PLAYER.GET_PLAYER_GROUP(PLAYER.PLAYER_ID())
-)
+    for i=1,n do
+        spawnBodyguard()
+        SYSTEM.WAIT(50)
+    end
 
-table.insert(bodyguards,ped)
+    notify("Bodyguards actifs: "..#bodyguards)
 
 end
 
-local function spawnMultiple()
+------------------------------------------------
+-- CLEANUP
+------------------------------------------------
 
-local player=PLAYER.PLAYER_PED_ID()
-local pos=ENTITY.GET_ENTITY_COORDS(player,true)
+local function cleanupBodyguards()
 
-for i=1,spawnAmount do
-spawnOne(
-pos.x+(i*1.2),
-pos.y+1.5,
-pos.z
-)
-end
+    for i=#bodyguards,1,-1 do
 
-info(spawnAmount.." bodyguards spawned")
+        local entry = bodyguards[i]
+
+        if not entry
+        or not entry.ped
+        or not ENTITY.DOES_ENTITY_EXIST(entry.ped)
+        or ENTITY.IS_ENTITY_DEAD(entry.ped)
+        then
+            table.remove(bodyguards,i)
+        end
+
+    end
 
 end
 
@@ -118,17 +205,67 @@ end
 
 local function deleteAll()
 
-for _,ped in pairs(bodyguards) do
+    for i,entry in pairs(bodyguards) do
 
-if ENTITY.DOES_ENTITY_EXIST(ped) then
-ENTITY.DELETE_ENTITY(ped)
+        if entry and entry.ped and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+
+            entities.delete_by_handle(entry.ped)
+
+        end
+
+    end
+
+    bodyguards = {}
+
+    notify("Tous supprimés")
+
 end
 
+------------------------------------------------
+-- ATTACK TARGET
+------------------------------------------------
+
+local function attackTarget()
+
+    local success,target = PLAYER.GET_ENTITY_PLAYER_IS_FREE_AIMING_AT(PLAYER.PLAYER_ID())
+
+    if success then
+
+        for _,entry in pairs(bodyguards) do
+
+            if entry and ENTITY.DOES_ENTITY_EXIST(entry.ped) then
+
+                TASK.TASK_COMBAT_PED(entry.ped,target,0,16)
+
+            end
+
+        end
+
+    end
+
 end
 
-bodyguards={}
+------------------------------------------------
+-- SPAWN VEHICLE
+------------------------------------------------
 
-info("All bodyguards deleted")
+local function spawnInVehicle()
+
+    local player = PLAYER.PLAYER_PED_ID()
+
+    if PED.IS_PED_IN_ANY_VEHICLE(player,false) then
+
+        local veh = PED.GET_VEHICLE_PED_IS_IN(player,false)
+
+        spawnBodyguard()
+
+        local last = bodyguards[#bodyguards]
+
+        if last and last.ped then
+            PED.SET_PED_INTO_VEHICLE(last.ped,veh,-2)
+        end
+
+    end
 
 end
 
@@ -136,87 +273,76 @@ end
 -- FEATURES
 ------------------------------------------------
 
-FeatureMgr.AddFeature(
-HASH_MODEL,
-"Agent Model",
-eFeatureType.Combo,
-"Choose model",
-function(f)
+FeatureMgr.AddFeature(Utils.Joaat("BG_Spawn1"),"Spawn Bodyguard","button","",function()
 
-local i=f:GetListIndex()
-currentModel=i+1
+    spawnAmountCustom(1)
 
-info("Model "..MODELS[currentModel].label)
+end)
 
-end,
-true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_Spawn5"),"Spawn 5 Bodyguards","button","",function()
 
-FeatureMgr.GetFeature(HASH_MODEL):SetList(MODEL_LABELS)
+    spawnAmountCustom(5)
 
-------------------------------------------------
+end)
 
-FeatureMgr.AddFeature(
-HASH_WEAPON,
-"Primary Weapon",
-eFeatureType.Combo,
-"Choose weapon",
-function(f)
+FeatureMgr.AddFeature(Utils.Joaat("BG_DeleteAll"),"Delete All","button","",function()
 
-local i=f:GetListIndex()
-currentWeapon=i+1
+    deleteAll()
 
-info("Weapon "..WEAPONS[currentWeapon].label)
+end)
 
-end,
-true
-)
+FeatureMgr.AddFeature(Utils.Joaat("BG_AttackTarget"),"Attack Target","button","",function()
 
-FeatureMgr.GetFeature(HASH_WEAPON):SetList(WEAPON_LABELS)
+    attackTarget()
+
+end)
+
+FeatureMgr.AddFeature(Utils.Joaat("BG_SpawnVehicle"),"Spawn In My Vehicle","button","",function()
+
+    spawnInVehicle()
+
+end)
 
 ------------------------------------------------
-
-FeatureMgr.AddFeature(
-HASH_AMOUNT,
-"Spawn Amount",
-eFeatureType.SliderInt,
-"Number of guards",
-function(f)
-
-spawnAmount=f:GetIntValue()
-
-end,
-true
-)
-
+-- MENU
 ------------------------------------------------
 
-FeatureMgr.AddFeature(
-Utils.Joaat("BG_Spawn"),
-"Spawn Bodyguards",
-eFeatureType.Button,
-"",
-function()
+ClickGUI.AddTab("Bodyguard Menu",function()
 
-spawnMultiple()
+    ClickGUI.BeginCustomChildWindow("Spawn")
 
-end,
-true
-)
+    ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn1"))
+    ClickGUI.RenderFeature(Utils.Joaat("BG_Spawn5"))
+    ClickGUI.RenderFeature(Utils.Joaat("BG_SpawnVehicle"))
+
+    ClickGUI.EndCustomChildWindow()
+
+    ClickGUI.BeginCustomChildWindow("Combat")
+
+    ClickGUI.RenderFeature(Utils.Joaat("BG_AttackTarget"))
+
+    ClickGUI.EndCustomChildWindow()
+
+    ClickGUI.BeginCustomChildWindow("Cleanup")
+
+    ClickGUI.RenderFeature(Utils.Joaat("BG_DeleteAll"))
+
+    ClickGUI.EndCustomChildWindow()
+
+end)
 
 ------------------------------------------------
+-- LOOP
+------------------------------------------------
 
-FeatureMgr.AddFeature(
-Utils.Joaat("BG_Delete"),
-"Delete All",
-eFeatureType.Button,
-"",
-function()
+script.register_looped("BodyguardLoop",function()
 
-deleteAll()
+    cleanupBodyguards()
 
-end,
-true
-)
+    if autoRespawn and #bodyguards < spawnAmount then
+        spawnBodyguard()
+    end
 
-info("Bodyguard Menu V15 Loaded")
+end)
+
+notify("Bodyguard Menu V15 Loaded")
