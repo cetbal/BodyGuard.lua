@@ -5,17 +5,15 @@ dofile("C:/Users/GarnalG/Documents/Cherax/Lua/DannyScript/Natives/natives.lua")
 --------------------------------------------------
 
 local bodyguards = {}
-local lastCombatTick = 0
-
 local behaviour = "Defensive"
 
 --------------------------------------------------
--- UTILS
+-- LOAD MODEL
 --------------------------------------------------
 
-local function loadModel(model)
+function loadModel(name)
 
-    local hash = MISC.GET_HASH_KEY(model)
+    local hash = MISC.GET_HASH_KEY(name)
 
     STREAMING.REQUEST_MODEL(hash)
 
@@ -50,10 +48,6 @@ function spawnBodyguard()
         true
     )
 
-    --------------------------------------------------
-    -- WEAPON
-    --------------------------------------------------
-
     WEAPON.GIVE_WEAPON_TO_PED(
         ped,
         MISC.GET_HASH_KEY("WEAPON_CARBINERIFLE"),
@@ -63,16 +57,35 @@ function spawnBodyguard()
     )
 
     PED.SET_PED_ACCURACY(ped,90)
-
     PED.SET_PED_ARMOUR(ped,100)
-
-    PED.SET_PED_AS_GROUP_MEMBER(ped, PED.GET_PED_GROUP_INDEX(playerPed))
-
-    PED.SET_PED_NEVER_LEAVES_GROUP(ped,true)
 
     PED.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS(ped,true)
 
+    local group = PED.GET_PED_GROUP_INDEX(playerPed)
+
+    PED.SET_PED_AS_GROUP_MEMBER(ped,group)
+
+    PED.SET_PED_NEVER_LEAVES_GROUP(ped,true)
+
     table.insert(bodyguards,ped)
+
+end
+
+--------------------------------------------------
+-- DELETE
+--------------------------------------------------
+
+function deleteAll()
+
+    for _,ped in ipairs(bodyguards) do
+
+        if ENTITY.DOES_ENTITY_EXIST(ped) then
+            PED.DELETE_PED(ped)
+        end
+
+    end
+
+    bodyguards = {}
 
 end
 
@@ -107,26 +120,25 @@ function followPlayer()
 end
 
 --------------------------------------------------
--- BODYGUARD AI
+-- AI THREAD (IMPORTANT POUR CHERAX)
 --------------------------------------------------
 
-function bodyguardAI()
+Script.RegisterLooped("Bodyguard_AI", function()
 
     local playerPed = PLAYER.PLAYER_PED_ID()
 
-    local time = MISC.GET_GAME_TIMER()
+    --------------------------------------------------
+    -- FOLLOW
+    --------------------------------------------------
 
-    if time - lastCombatTick < 2000 then
-        return
-    end
-
-    lastCombatTick = time
+    followPlayer()
 
     --------------------------------------------------
     -- PASSIVE
     --------------------------------------------------
 
     if behaviour == "Passive" then
+        SYSTEM.WAIT(2000)
         return
     end
 
@@ -137,6 +149,7 @@ function bodyguardAI()
     if behaviour == "Defensive" then
 
         if not PED.IS_PED_IN_COMBAT(playerPed,0) then
+            SYSTEM.WAIT(2000)
             return
         end
 
@@ -150,8 +163,6 @@ function bodyguardAI()
 
         if ENTITY.DOES_ENTITY_EXIST(ped) then
 
-            TASK.CLEAR_PED_TASKS(ped)
-
             TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(
                 ped,
                 120.0,
@@ -162,27 +173,9 @@ function bodyguardAI()
 
     end
 
-end
+    SYSTEM.WAIT(2000)
 
---------------------------------------------------
--- DELETE
---------------------------------------------------
-
-function deleteBodyguards()
-
-    for _,ped in ipairs(bodyguards) do
-
-        if ENTITY.DOES_ENTITY_EXIST(ped) then
-
-            PED.DELETE_PED(ped)
-
-        end
-
-    end
-
-    bodyguards = {}
-
-end
+end)
 
 --------------------------------------------------
 -- MENU
@@ -201,7 +194,7 @@ ClickGUI.AddTab("Bodyguard Menu", function()
     end
 
     if ClickGUI.Button("Delete All") then
-        deleteBodyguards()
+        deleteAll()
     end
 
     if ClickGUI.Button("Behaviour Passive") then
@@ -215,9 +208,5 @@ ClickGUI.AddTab("Bodyguard Menu", function()
     if ClickGUI.Button("Behaviour Aggressive") then
         behaviour = "Aggressive"
     end
-
-    followPlayer()
-
-    bodyguardAI()
 
 end)
