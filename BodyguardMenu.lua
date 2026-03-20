@@ -155,9 +155,10 @@ local function setupRelationshipGroups()
     end
 
     if REL_GROUP_BODYGUARDS == 0 then
-        local groupPtr = memory.alloc_int()
+        local groupPtr = Memory.AllocInt()
         PED.ADD_RELATIONSHIP_GROUP("BODYGUARDS_REL", groupPtr)
-        REL_GROUP_BODYGUARDS = memory.read_int(groupPtr)
+        REL_GROUP_BODYGUARDS = Memory.ReadInt(groupPtr)
+        Memory.Free(groupPtr)
     end
 
     safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(0, REL_GROUP_BODYGUARDS, REL_GROUP_BODYGUARDS) end)
@@ -460,7 +461,6 @@ local function spawnOneNow(offsetX, offsetY, offsetZ)
     safe(function() PED.SET_PED_CAN_SWITCH_WEAPON(ped, true) end)
 
     equipBodyguard(ped)
-    safe(function() TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(ped, 60.0, 0) end)
 
     local bg = {
         ped = ped,
