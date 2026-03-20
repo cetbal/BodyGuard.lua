@@ -275,8 +275,8 @@ local function applyPedCombatStyle(ped)
     safe(function() PED.SET_PED_ACCURACY(ped, settings.accuracy) end)
     safe(function() PED.SET_PED_ARMOUR(ped, settings.armour) end)
     safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
-    safe(function() PED.SET_PED_SEEING_RANGE(ped, 350.0) end)
-    safe(function() PED.SET_PED_HEARING_RANGE(ped, 350.0) end)
+    safe(function() PED.SET_PED_SEEING_RANGE(ped, 500.0) end)
+    safe(function() PED.SET_PED_HEARING_RANGE(ped, 500.0) end)
     safe(function() PED.SET_PED_ALERTNESS(ped, 3) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 0, true) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 1, true) end)
@@ -451,10 +451,14 @@ local function deleteAll()
     info("Delete All: " .. tostring(deletedCount))
 end
 
-local function playerNeedsProtection(playerPed)
-    local wanted = safe(function()
+local function playerWantedLevel()
+    return safe(function()
         return PLAYER.GET_PLAYER_WANTED_LEVEL(PLAYER.PLAYER_ID())
     end) or 0
+end
+
+local function playerNeedsProtection(playerPed)
+    local wanted = playerWantedLevel()
 
     local inCombat = safe(function()
         return PED.IS_PED_IN_COMBAT(playerPed, 0)
@@ -476,7 +480,7 @@ local function isBodyguardPed(ped)
     return false
 end
 
-local function isHostilePed(targetPed, playerPed)
+local function isValidEnemyPed(targetPed, playerPed)
     if not targetPed or targetPed == 0 then
         return false
     end
@@ -513,38 +517,10 @@ local function isHostilePed(targetPed, playerPed)
         return false
     end
 
-    local isCop = safe(function()
-        return PED.IS_PED_COP(targetPed)
-    end) or false
-
-    local inCombatWithPlayer = safe(function()
-        return PED.IS_PED_IN_COMBAT(targetPed, playerPed)
-    end) or false
-
-    local shooting = safe(function()
-        return PED.IS_PED_SHOOTING(targetPed)
-    end) or false
-
-    local canSeePlayer = safe(function()
-        return ENTITY.HAS_ENTITY_CLEAR_LOS_TO_ENTITY(targetPed, playerPed, 17)
-    end) or false
-
-    if isCop then
-        return true
-    end
-
-    if inCombatWithPlayer then
-        return true
-    end
-
-    if shooting and canSeePlayer then
-        return true
-    end
-
-    return false
+    return true
 end
 
-local function findNearestThreat(playerPed, fromPed)
+local function getNearestCop(playerPed, fromPed)
     local myCoords = ENTITY.GET_ENTITY_COORDS(fromPed, true)
     local bestPed = 0
     local bestDist = 999999999.0
@@ -558,21 +534,114 @@ local function findNearestThreat(playerPed, fromPed)
             return PoolMgr.GetPed(i)
         end) or 0
 
-        if ped ~= 0 and isHostilePed(ped, playerPed) then
-            local coords = ENTITY.GET_ENTITY_COORDS(ped, true)
-            local dx = coords.x - myCoords.x
-            local dy = coords.y - myCoords.y
-            local dz = coords.z - myCoords.z
-            local dist = (dx * dx + dy * dy + dz * dz)
+        if ped ~= 0 and isValidEnemyPed(ped, playerPed) then
+            local isCop = safe(function()
+                return PED.IS_PED_COP(ped)
+            end) or false
 
-            if dist < bestDist then
-                bestDist = dist
-                bestPed = ped
+            if isCop then
+                local coords = ENTITY.GET_ENTITY_COORDS(ped, true)
+                local dx = coords.x - myCoords.x
+                local dy = coords.y - myCoords.y
+                local dz = coords.z - myCoords.z
+                local dist = (dx * dx + dy * dy + dz * dz)
+
+                if dist < bestDist then
+                    bestDist = dist
+                    bestPed = ped
+                end
             end
         end
     end
 
     return bestPed
+end
+
+local function getNearestHostile(playerPed, fromPed)
+    local myCoords = ENTITY.GET_ENTITY_COORDS(fromPed, true)
+    local bestPed = 0
+    local bestDist = 999999999.0
+
+    local count = safe(function()
+        return PoolMgr.GetCurrentPedCount()
+    end) or 0
+
+    for i = 0, count - 1 do
+        local ped = safe(function()
+            return PoolMgr.GetPed(i)
+        end) or 0
+
+        if ped ~= 0 and isValidEnemyPed(ped, playerPed) then
+            local inCombatWithPlayer = safe(function()
+                return PED.IS_PED_IN_COMBAT(ped, playerPed)
+            end) or false
+
+            local shooting = safe(function()
+                return PED.IS_PED_SHOOTING(ped)
+            end) or false
+
+            local canSeePlayer = safe(function()
+                return ENTITY.HAS_ENTITY_CLEAR_LOS_TO_ENTITY(ped, playerPed, 17)
+            end) or false
+
+            if inCombatWithPlayer or (shooting and canSeePlayer) then
+                local coords = ENTITY.GET_ENTITY_COORDS(ped, true)
+                local dx = coords.x - myCoords.x
+                local dy = coords.y - myCoords.y
+                local dz = coords.z - myCoords.z
+                local dist = (dx * dx + dy * dy + dz * dz)
+
+                if dist < bestDist then
+                    bestDist = dist
+                    bestPed = ped
+                end
+            end
+        end
+    end
+
+    return bestPed
+end
+
+local function hasValidTarget(targetPed, playerPed)
+    if not targetPed or targetPed == 0 then
+        return false
+    end
+
+    if not isValidEnemyPed(targetPed, playerPed) then
+        return false
+    end
+
+    local wanted = playerWantedLevel()
+    local isCop = safe(function()
+        return PED.IS_PED_COP(targetPed)
+    end) or false
+
+    if wanted > 0 and isCop then
+        return true
+    end
+
+    local inCombatWithPlayer = safe(function()
+        return PED.IS_PED_IN_COMBAT(targetPed, playerPed)
+    end) or false
+
+    local shooting = safe(function()
+        return PED.IS_PED_SHOOTING(targetPed)
+    end) or false
+
+    return inCombatWithPlayer or shooting or isCop
+end
+
+local function findBestTarget(playerPed, fromPed)
+    local wanted = playerWantedLevel()
+
+    if wanted > 0 then
+        local cop = getNearestCop(playerPed, fromPed)
+        if cop ~= 0 then
+            return cop
+        end
+    end
+
+    return getNearestHostile(playerPed, fromPed)
 end
 
 local function engageTarget(bgPed, targetPed)
@@ -582,6 +651,7 @@ local function engageTarget(bgPed, targetPed)
 
     ensureWeapon(bgPed)
     safe(function() TASK.TASK_COMBAT_PED(bgPed, targetPed, 0, 16) end)
+    safe(function() PED.SET_PED_KEEP_TASK(bgPed, true) end)
 end
 
 local function clearCombatAndResumeFollow(bgPed, playerPed, index, total)
@@ -606,8 +676,9 @@ local function attackNearby()
 
     for _, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
-            local target = findNearestThreat(playerPed, bg.ped)
+            local target = findBestTarget(playerPed, bg.ped)
             if target ~= 0 then
+                bg.target = target
                 engageTarget(bg.ped, target)
             end
         end
@@ -832,7 +903,7 @@ end
 
 Script.RegisterLooped(function()
     local now = Time.GetEpocheMs()
-    if now - lastAiTick < 700 then
+    if now - lastAiTick < 500 then
         return
     end
     lastAiTick = now
@@ -853,12 +924,18 @@ Script.RegisterLooped(function()
             ensureWeapon(bg.ped)
 
             if protectNow then
-                local target = findNearestThreat(playerPed, bg.ped)
-                if target ~= 0 then
+                local target = 0
+
+                if hasValidTarget(bg.target, playerPed) then
+                    target = bg.target
+                else
+                    target = findBestTarget(playerPed, bg.ped)
                     bg.target = target
+                end
+
+                if target ~= 0 then
                     engageTarget(bg.ped, target)
                 else
-                    bg.target = 0
                     if settings.followPlayer then
                         hardFollowOne(bg.ped, playerPed, i, #bodyguards)
                     end
@@ -1144,7 +1221,7 @@ ClickGUI.AddTab("Better Bodyguards", function()
     end
 end)
 
-dbg("Bodyguards direct-target version loaded")
+dbg("Bodyguards anti-cop target version loaded")
 dbg("Models: " .. tostring(#MODELS) .. " | Weapons: " .. tostring(#WEAPONS))
 info("Better Bodyguards chargé")
 info("AI Mode: " .. getAiMode())
