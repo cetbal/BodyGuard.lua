@@ -7,11 +7,11 @@ local lastAiTick = 0
 
 local settings = {
     modelIndex = 1,
-    weaponIndex = 1,
+    weaponIndex = 4,
     formationIndex = 1,
     aiModeIndex = 2, -- 1 Neutral / 2 Defense / 3 Offensive
     spawnAmount = 3,
-    accuracy = 75,
+    accuracy = 85,
     armour = 100,
     followDistance = 3,
     godMode = false,
@@ -32,8 +32,8 @@ local MODELS = {
 local WEAPONS = {
     { label = "Pistol",        weapon = "WEAPON_PISTOL",       ammo = 500  },
     { label = "Combat Pistol", weapon = "WEAPON_COMBATPISTOL", ammo = 500  },
-    { label = "SMG",           weapon = "WEAPON_SMG",          ammo = 1000 },
-    { label = "Carbine Rifle", weapon = "WEAPON_CARBINERIFLE", ammo = 1500 },
+    { label = "SMG",           weapon = "WEAPON_SMG",          ammo = 1200 },
+    { label = "Carbine Rifle", weapon = "WEAPON_CARBINERIFLE", ammo = 1600 },
     { label = "Pump Shotgun",  weapon = "WEAPON_PUMPSHOTGUN",  ammo = 300  }
 }
 
@@ -272,10 +272,16 @@ local function applyPedCombatStyle(ped)
     safe(function() PED.SET_PED_ACCURACY(ped, settings.accuracy) end)
     safe(function() PED.SET_PED_ARMOUR(ped, settings.armour) end)
     safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
-    safe(function() PED.SET_PED_SEEING_RANGE(ped, 120.0) end)
-    safe(function() PED.SET_PED_HEARING_RANGE(ped, 120.0) end)
+    safe(function() PED.SET_PED_SEEING_RANGE(ped, 300.0) end)
+    safe(function() PED.SET_PED_HEARING_RANGE(ped, 300.0) end)
     safe(function() PED.SET_PED_ALERTNESS(ped, 3) end)
+    safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 0, true) end)
+    safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 1, true) end)
+    safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 2, true) end)
+    safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 3, true) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 5, true) end)
+    safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 13, true) end)
+    safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 20, true) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 46, true) end)
 
     if settings.godMode then
@@ -289,13 +295,13 @@ local function applyPedCombatStyle(ped)
         safe(function() PED.SET_PED_COMBAT_RANGE(ped, 0) end)
         safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 0) end)
     elseif mode == "Defense" then
-        safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 1) end)
-        safe(function() PED.SET_PED_COMBAT_RANGE(ped, 1) end)
-        safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 1) end)
-    else
         safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 2) end)
         safe(function() PED.SET_PED_COMBAT_RANGE(ped, 2) end)
         safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 2) end)
+    else
+        safe(function() PED.SET_PED_COMBAT_ABILITY(ped, 2) end)
+        safe(function() PED.SET_PED_COMBAT_RANGE(ped, 2) end)
+        safe(function() PED.SET_PED_COMBAT_MOVEMENT(ped, 3) end)
     end
 end
 
@@ -303,10 +309,15 @@ local function equipBodyguard(ped)
     local weapon = getWeapon()
     local weaponHash = MISC.GET_HASH_KEY(weapon.weapon)
 
+    safe(function() WEAPON.REMOVE_ALL_PED_WEAPONS(ped, true) end)
     safe(function() WEAPON.GIVE_WEAPON_TO_PED(ped, weaponHash, weapon.ammo, false, true) end)
+    safe(function() WEAPON.SET_PED_AMMO(ped, weaponHash, weapon.ammo) end)
+    safe(function() WEAPON.SET_CURRENT_PED_WEAPON(ped, weaponHash, true) end)
+
     safe(function() PED.SET_PED_DROPS_WEAPONS_WHEN_DEAD(ped, false) end)
     safe(function() PED.SET_PED_CAN_SWITCH_WEAPON(ped, true) end)
     safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, true) end)
+    safe(function() PED.SET_PED_SHOOT_RATE(ped, 1000) end)
 
     setAsPlayerGroupMember(ped)
     applyPedCombatStyle(ped)
@@ -337,6 +348,23 @@ local function formationOffset(i, total)
     end
 end
 
+local function hardFollowOne(bgPed, playerPed, index, total)
+    local x, y, z = formationOffset(index, total)
+    safe(function()
+        TASK.TASK_FOLLOW_TO_OFFSET_OF_ENTITY(
+            bgPed,
+            playerPed,
+            x,
+            y,
+            z,
+            4.0,
+            -1,
+            2.0,
+            true
+        )
+    end)
+end
+
 local function followAll()
     if not settings.followPlayer then
         return
@@ -351,20 +379,7 @@ local function followAll()
 
     for i, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
-            local x, y, z = formationOffset(i, #bodyguards)
-            safe(function()
-                TASK.TASK_FOLLOW_TO_OFFSET_OF_ENTITY(
-                    bg.ped,
-                    playerPed,
-                    x,
-                    y,
-                    z,
-                    3.0,
-                    -1,
-                    2.0,
-                    true
-                )
-            end)
+            hardFollowOne(bg.ped, playerPed, i, #bodyguards)
         end
     end
 end
@@ -408,6 +423,7 @@ local function spawnOneNow(offsetX, offsetY, offsetZ)
     safe(function() PED.SET_PED_DIES_WHEN_INJURED(ped, false) end)
     safe(function() PED.SET_PED_SUFFERS_CRITICAL_HITS(ped, false) end)
     safe(function() PED.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS(ped, true) end)
+    safe(function() PED.SET_PED_CAN_SWITCH_WEAPON(ped, true) end)
 
     equipBodyguard(ped)
 
@@ -488,18 +504,6 @@ local function teleportAllToMe()
     end
 
     followAll()
-end
-
-local function attackNearby()
-    cleanBodyguards()
-
-    for _, bg in ipairs(bodyguards) do
-        if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
-            safe(function()
-                TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bg.ped, 80.0, 0)
-            end)
-        end
-    end
 end
 
 local function spawnInMyVehicle()
@@ -667,7 +671,6 @@ local function deleteDeadOnly()
                 if bg.blip then
                     hideBlip(bg.blip)
                 end
-
                 hardDespawnPed(bg.ped)
                 deletedCount = deletedCount + 1
                 keep = false
@@ -715,49 +718,189 @@ local function reviveMissing()
     end
 end
 
+local function isBodyguardPed(ped)
+    for _, bg in ipairs(bodyguards) do
+        if bg and bg.ped == ped then
+            return true
+        end
+    end
+    return false
+end
+
+local function isValidHostileTarget(targetPed, playerPed)
+    if not targetPed or targetPed == 0 then
+        return false
+    end
+
+    local exists = safe(function()
+        return ENTITY.DOES_ENTITY_EXIST(targetPed)
+    end) or false
+
+    if not exists then
+        return false
+    end
+
+    if targetPed == playerPed then
+        return false
+    end
+
+    if isBodyguardPed(targetPed) then
+        return false
+    end
+
+    local dead = safe(function()
+        return ENTITY.GET_ENTITY_HEALTH(targetPed) <= 0
+    end) or true
+
+    if dead then
+        return false
+    end
+
+    local injured = safe(function()
+        return PED.IS_PED_INJURED(targetPed)
+    end) or false
+
+    if injured then
+        return false
+    end
+
+    local isPlayer = safe(function()
+        return PED.IS_PED_A_PLAYER(targetPed)
+    end) or false
+
+    if isPlayer then
+        return false
+    end
+
+    local isCop = safe(function()
+        return PED.IS_PED_COP(targetPed)
+    end) or false
+
+    local inCombatWithPlayer = safe(function()
+        return PED.IS_PED_IN_COMBAT(targetPed, playerPed)
+    end) or false
+
+    local shooting = safe(function()
+        return PED.IS_PED_SHOOTING(targetPed)
+    end) or false
+
+    local canSeePlayer = safe(function()
+        return ENTITY.HAS_ENTITY_CLEAR_LOS_TO_ENTITY(targetPed, playerPed, 17)
+    end) or false
+
+    if isCop then
+        return true
+    end
+
+    if inCombatWithPlayer then
+        return true
+    end
+
+    if shooting and canSeePlayer then
+        return true
+    end
+
+    return false
+end
+
+local function findNearestHostileForPlayer(playerPed, fromPed)
+    local myCoords = ENTITY.GET_ENTITY_COORDS(fromPed, true)
+    local bestTarget = 0
+    local bestDist = 999999999.0
+
+    for ped = 1, 256 do
+        local exists = safe(function()
+            return ENTITY.DOES_ENTITY_EXIST(ped)
+        end) or false
+
+        if exists and isValidHostileTarget(ped, playerPed) then
+            local coords = ENTITY.GET_ENTITY_COORDS(ped, true)
+            local dx = coords.x - myCoords.x
+            local dy = coords.y - myCoords.y
+            local dz = coords.z - myCoords.z
+            local dist = (dx * dx + dy * dy + dz * dz)
+
+            if dist < bestDist then
+                bestDist = dist
+                bestTarget = ped
+            end
+        end
+    end
+
+    return bestTarget
+end
+
+local function engageTarget(bgPed, targetPed)
+    if not bgPed or bgPed == 0 or not targetPed or targetPed == 0 then
+        return
+    end
+
+    safe(function() TASK.CLEAR_PED_TASKS(bgPed) end)
+    safe(function() TASK.TASK_COMBAT_PED(bgPed, targetPed, 0, 16) end)
+end
+
+local function attackNearby()
+    local playerPed = PLAYER.PLAYER_PED_ID()
+    if playerPed == 0 then
+        return
+    end
+
+    cleanBodyguards()
+
+    for _, bg in ipairs(bodyguards) do
+        if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
+            local target = findNearestHostileForPlayer(playerPed, bg.ped)
+            if target ~= 0 then
+                engageTarget(bg.ped, target)
+            else
+                safe(function()
+                    TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bg.ped, 120.0, 0)
+                end)
+            end
+        end
+    end
+end
+
 Script.RegisterLooped("BetterBodyguards_AI", function()
     if ShouldUnload and ShouldUnload() then
         return
     end
 
     local now = Time.GetEpocheMs()
-    if now - lastAiTick < 750 then
+    if now - lastAiTick < 500 then
         return
     end
     lastAiTick = now
 
     cleanBodyguards()
 
-    if settings.followPlayer then
-        followAll()
-    end
-
     local playerPed = PLAYER.PLAYER_PED_ID()
     if playerPed == 0 then
         return
     end
 
-    local playerInCombat = false
-    safe(function()
-        playerInCombat = PED.IS_PED_IN_COMBAT(playerPed, 0)
-    end)
-
     local mode = getAiMode()
 
-    for _, bg in ipairs(bodyguards) do
+    for i, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
             applyPedCombatStyle(bg.ped)
             applyBlip(bg)
 
-            if settings.protectPlayer then
-                if mode == "Offensive" then
-                    safe(function()
-                        TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bg.ped, 120.0, 0)
-                    end)
-                elseif mode == "Defense" and playerInCombat then
-                    safe(function()
-                        TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bg.ped, 90.0, 0)
-                    end)
+            local weaponHash = MISC.GET_HASH_KEY(getWeapon().weapon)
+            safe(function() WEAPON.SET_CURRENT_PED_WEAPON(bg.ped, weaponHash, true) end)
+            safe(function() WEAPON.SET_PED_AMMO(bg.ped, weaponHash, getWeapon().ammo) end)
+
+            local target = 0
+
+            if settings.protectPlayer and mode ~= "Neutral" then
+                target = findNearestHostileForPlayer(playerPed, bg.ped)
+            end
+
+            if target ~= 0 then
+                engageTarget(bg.ped, target)
+            else
+                if settings.followPlayer then
+                    hardFollowOne(bg.ped, playerPed, i, #bodyguards)
                 end
             end
         end
@@ -933,19 +1076,19 @@ end
 local f = getFeature(HASH_MODEL_COMBO)
 if f then
     f:SetList(modelLabels)
-    f:SetListIndex(0)
+    f:SetListIndex(settings.modelIndex - 1)
 end
 
 f = getFeature(HASH_WEAPON_COMBO)
 if f then
     f:SetList(weaponLabels)
-    f:SetListIndex(0)
+    f:SetListIndex(settings.weaponIndex - 1)
 end
 
 f = getFeature(HASH_AI_COMBO)
 if f then
     f:SetList(aiLabels)
-    f:SetListIndex(1)
+    f:SetListIndex(settings.aiModeIndex - 1)
 end
 
 f = getFeature(HASH_AMOUNT_SLIDER)
@@ -953,7 +1096,7 @@ if f then
     f:SetLimitValues(1, 20)
     f:SetStepSize(1)
     f:SetFormat("%d")
-    f:SetIntValue(3)
+    f:SetIntValue(settings.spawnAmount)
 end
 
 f = getFeature(HASH_ACCURACY_SLIDER)
@@ -961,7 +1104,7 @@ if f then
     f:SetLimitValues(1, 100)
     f:SetStepSize(1)
     f:SetFormat("%d")
-    f:SetIntValue(75)
+    f:SetIntValue(settings.accuracy)
 end
 
 f = getFeature(HASH_ARMOUR_SLIDER)
@@ -969,7 +1112,7 @@ if f then
     f:SetLimitValues(0, 100)
     f:SetStepSize(1)
     f:SetFormat("%d")
-    f:SetIntValue(100)
+    f:SetIntValue(settings.armour)
 end
 
 f = getFeature(HASH_DISTANCE_SLIDER)
@@ -977,7 +1120,7 @@ if f then
     f:SetLimitValues(1, 15)
     f:SetStepSize(1)
     f:SetFormat("%d")
-    f:SetIntValue(3)
+    f:SetIntValue(settings.followDistance)
 end
 
 ClickGUI.AddTab("Better Bodyguards", function()
@@ -1038,3 +1181,5 @@ ClickGUI.AddTab("Better Bodyguards", function()
 end)
 
 info("Better Bodyguards chargé")
+info("AI Mode: " .. getAiMode())
+info("Weapon: " .. getWeapon().label)
