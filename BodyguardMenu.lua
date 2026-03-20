@@ -1,6 +1,9 @@
 dofile("C:/Users/GarnalG/Documents/Cherax/Lua/DannyScript/Natives/natives.lua")
 
+local SCRIPT_NAME = "BetterBodyguards"
+
 local bodyguards = {}
+local lastAiTick = 0
 
 local settings = {
     modelIndex = 1,
@@ -19,19 +22,19 @@ local settings = {
 }
 
 local MODELS = {
-    { label = "Security", model = "s_m_m_security_01" },
-    { label = "FIB", model = "s_m_m_fiboffice_01" },
-    { label = "IAA", model = "s_m_m_ciasec_01" },
-    { label = "SWAT", model = "s_m_y_swat_01" },
-    { label = "Black Ops", model = "s_m_y_blackops_01" }
+    { label = "Security",  model = "s_m_m_security_01"  },
+    { label = "FIB",       model = "s_m_m_fiboffice_01" },
+    { label = "IAA",       model = "s_m_m_ciasec_01"    },
+    { label = "SWAT",      model = "s_m_y_swat_01"      },
+    { label = "Black Ops", model = "s_m_y_blackops_01"  }
 }
 
 local WEAPONS = {
-    { label = "Pistol", weapon = "WEAPON_PISTOL", ammo = 500 },
-    { label = "Combat Pistol", weapon = "WEAPON_COMBATPISTOL", ammo = 500 },
-    { label = "SMG", weapon = "WEAPON_SMG", ammo = 1000 },
+    { label = "Pistol",        weapon = "WEAPON_PISTOL",       ammo = 500  },
+    { label = "Combat Pistol", weapon = "WEAPON_COMBATPISTOL", ammo = 500  },
+    { label = "SMG",           weapon = "WEAPON_SMG",          ammo = 1000 },
     { label = "Carbine Rifle", weapon = "WEAPON_CARBINERIFLE", ammo = 1500 },
-    { label = "Pump Shotgun", weapon = "WEAPON_PUMPSHOTGUN", ammo = 300 }
+    { label = "Pump Shotgun",  weapon = "WEAPON_PUMPSHOTGUN",  ammo = 300  }
 }
 
 local FORMATIONS = {
@@ -47,48 +50,46 @@ local AI_MODES = {
     "Offensive"
 }
 
-local HASH_MODEL_COMBO      = Utils.Joaat("BGV3_ModelCombo")
-local HASH_WEAPON_COMBO     = Utils.Joaat("BGV3_WeaponCombo")
-local HASH_AI_COMBO         = Utils.Joaat("BGV3_AiCombo")
-local HASH_AMOUNT_SLIDER    = Utils.Joaat("BGV3_Amount")
-local HASH_ACCURACY_SLIDER  = Utils.Joaat("BGV3_Accuracy")
-local HASH_ARMOUR_SLIDER    = Utils.Joaat("BGV3_Armour")
-local HASH_DISTANCE_SLIDER  = Utils.Joaat("BGV3_Distance")
+local HASH_MODEL_COMBO      = Utils.Joaat("BBG_ModelCombo")
+local HASH_WEAPON_COMBO     = Utils.Joaat("BBG_WeaponCombo")
+local HASH_AI_COMBO         = Utils.Joaat("BBG_AiCombo")
+local HASH_AMOUNT_SLIDER    = Utils.Joaat("BBG_AmountSlider")
+local HASH_ACCURACY_SLIDER  = Utils.Joaat("BBG_AccuracySlider")
+local HASH_ARMOUR_SLIDER    = Utils.Joaat("BBG_ArmourSlider")
+local HASH_DISTANCE_SLIDER  = Utils.Joaat("BBG_DistanceSlider")
 
-local HASH_GODMODE          = Utils.Joaat("BGV3_GodMode")
-local HASH_SHOWBLIPS        = Utils.Joaat("BGV3_ShowBlips")
-local HASH_FOLLOWPLAYER     = Utils.Joaat("BGV3_FollowPlayer")
-local HASH_PROTECTPLAYER    = Utils.Joaat("BGV3_ProtectPlayer")
-local HASH_AUTORESPAWN      = Utils.Joaat("BGV3_AutoRespawn")
+local HASH_GODMODE          = Utils.Joaat("BBG_GodMode")
+local HASH_SHOWBLIPS        = Utils.Joaat("BBG_ShowBlips")
+local HASH_FOLLOWPLAYER     = Utils.Joaat("BBG_FollowPlayer")
+local HASH_PROTECTPLAYER    = Utils.Joaat("BBG_ProtectPlayer")
+local HASH_AUTORESPAWN      = Utils.Joaat("BBG_AutoRespawn")
 
-local HASH_PREVFORMATION    = Utils.Joaat("BGV3_PrevFormation")
-local HASH_NEXTFORMATION    = Utils.Joaat("BGV3_NextFormation")
-local HASH_SHOWFORMATION    = Utils.Joaat("BGV3_ShowFormation")
-local HASH_SHOWMODE         = Utils.Joaat("BGV3_ShowMode")
-local HASH_SHOWCOUNT        = Utils.Joaat("BGV3_ShowCount")
+local HASH_PREVFORMATION    = Utils.Joaat("BBG_PrevFormation")
+local HASH_NEXTFORMATION    = Utils.Joaat("BBG_NextFormation")
+local HASH_SHOWFORMATION    = Utils.Joaat("BBG_ShowFormation")
+local HASH_SHOWMODE         = Utils.Joaat("BBG_ShowMode")
+local HASH_SHOWCOUNT        = Utils.Joaat("BBG_ShowCount")
 
-local HASH_SPAWNSELECTED    = Utils.Joaat("BGV3_SpawnSelected")
-local HASH_SPAWN1           = Utils.Joaat("BGV3_Spawn1")
-local HASH_SPAWN5           = Utils.Joaat("BGV3_Spawn5")
-local HASH_SPAWN10          = Utils.Joaat("BGV3_Spawn10")
+local HASH_SPAWNSELECTED    = Utils.Joaat("BBG_SpawnSelected")
+local HASH_SPAWN1           = Utils.Joaat("BBG_Spawn1")
+local HASH_SPAWN5           = Utils.Joaat("BBG_Spawn5")
+local HASH_SPAWN10          = Utils.Joaat("BBG_Spawn10")
 
-local HASH_SPAWNVEHICLE     = Utils.Joaat("BGV3_SpawnVehicle")
-local HASH_ENTERVEHICLE     = Utils.Joaat("BGV3_EnterVehicle")
-local HASH_EXITVEHICLE      = Utils.Joaat("BGV3_ExitVehicle")
-local HASH_TPVEHICLE        = Utils.Joaat("BGV3_TpVehicle")
-local HASH_ATTACKNEARBY     = Utils.Joaat("BGV3_AttackNearby")
-local HASH_REVIVEMISSING    = Utils.Joaat("BGV3_ReviveMissing")
-local HASH_TPTOME           = Utils.Joaat("BGV3_TpToMe")
+local HASH_SPAWNVEHICLE     = Utils.Joaat("BBG_SpawnVehicle")
+local HASH_ENTERVEHICLE     = Utils.Joaat("BBG_EnterVehicle")
+local HASH_EXITVEHICLE      = Utils.Joaat("BBG_ExitVehicle")
+local HASH_TPVEHICLE        = Utils.Joaat("BBG_TpVehicle")
+local HASH_ATTACKNEARBY     = Utils.Joaat("BBG_AttackNearby")
+local HASH_REVIVEMISSING    = Utils.Joaat("BBG_ReviveMissing")
+local HASH_TPTOME           = Utils.Joaat("BBG_TpToMe")
 
-local HASH_DELETEDEAD       = Utils.Joaat("BGV3_DeleteDead")
-local HASH_DELETEALL        = Utils.Joaat("BGV3_DeleteAll")
-local HASH_REFRESHALL       = Utils.Joaat("BGV3_Refresh")
-
-local lastAiTick = 0
+local HASH_DELETEDEAD       = Utils.Joaat("BBG_DeleteDead")
+local HASH_DELETEALL        = Utils.Joaat("BBG_DeleteAll")
+local HASH_REFRESHALL       = Utils.Joaat("BBG_RefreshAll")
 
 local function info(msg)
-    Logger.Log(eLogColor.LIGHTGREEN, "BetterBodyguards", msg)
-    GUI.AddToast("BetterBodyguards", msg, 3000, eToastPos.TOP_RIGHT)
+    Logger.Log(eLogColor.LIGHTGREEN, SCRIPT_NAME, msg)
+    GUI.AddToast(SCRIPT_NAME, msg, 3000, eToastPos.TOP_RIGHT)
 end
 
 local function safe(fn)
@@ -121,19 +122,28 @@ end
 
 local function setToggleSilently(hash, state)
     local f = getFeature(hash)
-    if f then
-        local toggled = safe(function() return f:IsToggled() end)
-        if toggled ~= state then
-            safe(function() f:Toggle(state) end)
-        end
+    if not f then
+        return
+    end
+
+    local current = safe(function()
+        return f:IsToggled()
+    end)
+
+    if current ~= state then
+        safe(function()
+            f:Toggle(state)
+        end)
     end
 end
 
 local function loadModel(modelName)
     local hash = MISC.GET_HASH_KEY(modelName)
+
     if not STREAMING.IS_MODEL_IN_CDIMAGE(hash) then
         return 0
     end
+
     if not STREAMING.IS_MODEL_VALID(hash) then
         return 0
     end
@@ -156,12 +166,14 @@ local function hideBlip(blip)
     if not blip or blip == 0 then
         return
     end
+
     safe(function() HUD.SET_BLIP_DISPLAY(blip, 0) end)
     safe(function() HUD.SET_BLIP_ALPHA(blip, 0) end)
 end
 
 local function createBlip(ped)
     local blip = HUD.ADD_BLIP_FOR_ENTITY(ped)
+
     if blip ~= 0 then
         safe(function() HUD.SET_BLIP_AS_FRIENDLY(blip, true) end)
         safe(function() HUD.SET_BLIP_COLOUR(blip, 5) end)
@@ -170,6 +182,7 @@ local function createBlip(ped)
         safe(function() HUD.SET_BLIP_AS_SHORT_RANGE(blip, false) end)
         safe(function() HUD.SET_BLIP_HIGH_DETAIL(blip, true) end)
     end
+
     return blip
 end
 
@@ -187,10 +200,21 @@ local function applyBlip(bg)
     end
 end
 
+local function removeFromPlayerGroup(ped)
+    if not ped or ped == 0 then
+        return
+    end
+
+    safe(function() PED.REMOVE_PED_FROM_GROUP(ped) end)
+    safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, false) end)
+end
+
 local function cleanBodyguards()
-    local newList = {}
+    local kept = {}
+
     for _, bg in ipairs(bodyguards) do
         local exists = false
+
         if bg and bg.ped and bg.ped ~= 0 then
             exists = safe(function()
                 return ENTITY.DOES_ENTITY_EXIST(bg.ped)
@@ -198,14 +222,25 @@ local function cleanBodyguards()
         end
 
         if exists then
-            table.insert(newList, bg)
+            local hp = safe(function()
+                return ENTITY.GET_ENTITY_HEALTH(bg.ped)
+            end) or 0
+
+            if hp > 0 then
+                table.insert(kept, bg)
+            else
+                if bg.blip then
+                    hideBlip(bg.blip)
+                end
+            end
         else
             if bg and bg.blip then
                 hideBlip(bg.blip)
             end
         end
     end
-    bodyguards = newList
+
+    bodyguards = kept
 end
 
 local function countBodyguards()
@@ -396,10 +431,10 @@ end
 
 local function spawnMany(amount)
     local offsets = {
-        { 2.0, 2.0, 1.0 },
-        { -2.0, 2.0, 1.0 },
-        { 0.0, 3.0, 1.0 },
-        { 4.0, -1.0, 1.0 },
+        {  2.0,  2.0, 1.0 },
+        { -2.0,  2.0, 1.0 },
+        {  0.0,  3.0, 1.0 },
+        {  4.0, -1.0, 1.0 },
         { -4.0, -1.0, 1.0 }
     }
 
@@ -457,6 +492,7 @@ end
 
 local function attackNearby()
     cleanBodyguards()
+
     for _, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
             safe(function()
@@ -502,6 +538,7 @@ local function putAllInMyVehicle()
     local seat = 0
 
     cleanBodyguards()
+
     for _, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
             safe(function() PED.SET_PED_INTO_VEHICLE(bg.ped, veh, seat) end)
@@ -512,6 +549,7 @@ end
 
 local function exitVehicleAll()
     cleanBodyguards()
+
     for _, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
             local inVeh = safe(function()
@@ -542,6 +580,7 @@ local function tpToVehicle()
     local coords = ENTITY.GET_ENTITY_COORDS(veh, true)
 
     cleanBodyguards()
+
     for i, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
             safe(function()
@@ -560,9 +599,9 @@ local function tpToVehicle()
     end
 end
 
-local function forceDeletePed(ped)
+local function hardDespawnPed(ped)
     if not ped or ped == 0 then
-        return false
+        return true
     end
 
     local exists = safe(function()
@@ -570,45 +609,44 @@ local function forceDeletePed(ped)
     end)
 
     if not exists then
-        return false
+        return true
     end
 
+    removeFromPlayerGroup(ped)
+
     safe(function() ENTITY.SET_ENTITY_INVINCIBLE(ped, false) end)
-    safe(function() PED.SET_PED_KEEP_TASK(ped, false) end)
     safe(function() PED.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS(ped, false) end)
+    safe(function() PED.SET_PED_KEEP_TASK(ped, false) end)
     safe(function() TASK.CLEAR_PED_TASKS_IMMEDIATELY(ped) end)
     safe(function() ENTITY.DETACH_ENTITY(ped, true, true) end)
     safe(function() ENTITY.FREEZE_ENTITY_POSITION(ped, false) end)
-    safe(function() ENTITY.SET_ENTITY_AS_MISSION_ENTITY(ped, true, true) end)
 
-    local deleted = safe(function()
-        ENTITY.DELETE_ENTITY(ped)
-        return not ENTITY.DOES_ENTITY_EXIST(ped)
+    local x, y, z = 0.0, 0.0, -200.0
+    safe(function()
+        local coords = ENTITY.GET_ENTITY_COORDS(ped, true)
+        x = coords.x
+        y = coords.y
+        z = coords.z - 200.0
     end)
 
-    if deleted then
-        return true
-    end
+    safe(function()
+        ENTITY.SET_ENTITY_COORDS(
+            ped,
+            x,
+            y,
+            z,
+            false,
+            false,
+            false,
+            false
+        )
+    end)
 
     safe(function() ENTITY.SET_ENTITY_HEALTH(ped, 0, 0, 0) end)
-    safe(function() PED.DELETE_PED(ped) end)
-
-    local stillExists = safe(function()
-        return ENTITY.DOES_ENTITY_EXIST(ped)
-    end)
-
-    if stillExists == false then
-        return true
-    end
-
+    safe(function() ENTITY.SET_ENTITY_AS_MISSION_ENTITY(ped, false, false) end)
     safe(function() ENTITY.SET_ENTITY_AS_NO_LONGER_NEEDED(ped) end)
-    safe(function() ENTITY.DELETE_ENTITY(ped) end)
 
-    local finalExists = safe(function()
-        return ENTITY.DOES_ENTITY_EXIST(ped)
-    end)
-
-    return not finalExists
+    return true
 end
 
 local function deleteDeadOnly()
@@ -629,7 +667,8 @@ local function deleteDeadOnly()
                 if bg.blip then
                     hideBlip(bg.blip)
                 end
-                forceDeletePed(bg.ped)
+
+                hardDespawnPed(bg.ped)
                 deletedCount = deletedCount + 1
                 keep = false
             end
@@ -659,7 +698,8 @@ local function deleteAll()
             hideBlip(bg.blip)
         end
 
-        if bg and bg.ped and forceDeletePed(bg.ped) then
+        if bg and bg.ped then
+            hardDespawnPed(bg.ped)
             deletedCount = deletedCount + 1
         end
     end
