@@ -96,6 +96,10 @@ local function info(msg)
     GUI.AddToast(SCRIPT_NAME, msg, 3000, eToastPos.TOP_RIGHT)
 end
 
+local function dbg(msg)
+    Logger.Log(eLogColor.LIGHTGREEN, SCRIPT_NAME, msg)
+end
+
 local function safe(fn)
     local ok, result = pcall(fn)
     if ok then
@@ -151,7 +155,9 @@ local function setupRelationshipGroups()
     end
 
     if REL_GROUP_BODYGUARDS == 0 then
-        REL_GROUP_BODYGUARDS = MISC.GET_HASH_KEY("BODYGUARDS_REL")
+        local groupPtr = memory.alloc_int()
+        PED.ADD_RELATIONSHIP_GROUP("BODYGUARDS_REL", groupPtr)
+        REL_GROUP_BODYGUARDS = memory.read_int(groupPtr)
     end
 
     safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(0, REL_GROUP_BODYGUARDS, REL_GROUP_BODYGUARDS) end)
@@ -160,6 +166,9 @@ local function setupRelationshipGroups()
 
     safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(5, REL_GROUP_BODYGUARDS, REL_GROUP_COP) end)
     safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(5, REL_GROUP_COP, REL_GROUP_BODYGUARDS) end)
+
+    dbg("Player rel hash: " .. tostring(REL_GROUP_PLAYER) .. " | BG hash: " .. tostring(REL_GROUP_BODYGUARDS))
+    dbg("Relationships initialized OK")
 end
 
 local function loadModel(modelName)
@@ -318,6 +327,7 @@ end
 local function equipBodyguard(ped)
     local weapon = getWeapon()
     local weaponHash = MISC.GET_HASH_KEY(weapon.weapon)
+    local playerPed = PLAYER.PLAYER_PED_ID()
 
     setupRelationshipGroups()
 
@@ -331,7 +341,18 @@ local function equipBodyguard(ped)
     safe(function() PED.SET_PED_CAN_SWITCH_WEAPON(ped, true) end)
     safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, true) end)
     safe(function() PED.SET_PED_SHOOT_RATE(ped, 1000) end)
-    safe(function() PED.SET_PED_AS_GROUP_MEMBER(ped, PED.GET_PED_GROUP_INDEX(PLAYER.PLAYER_PED_ID())) end)
+    safe(function() PED.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS(ped, true) end)
+    safe(function() PED.SET_PED_KEEP_TASK(ped, true) end)
+
+    if playerPed ~= 0 then
+        local group = safe(function()
+            return PED.GET_PED_GROUP_INDEX(playerPed)
+        end)
+
+        if group and group ~= 0 then
+            safe(function() PED.SET_PED_AS_GROUP_MEMBER(ped, group) end)
+        end
+    end
 
     applyPedCombatStyle(ped)
 end
@@ -439,6 +460,7 @@ local function spawnOneNow(offsetX, offsetY, offsetZ)
     safe(function() PED.SET_PED_CAN_SWITCH_WEAPON(ped, true) end)
 
     equipBodyguard(ped)
+    safe(function() TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(ped, 60.0, 0) end)
 
     local bg = {
         ped = ped,
@@ -768,7 +790,8 @@ local function forceBodyguardCombat(bgPed)
 
     safe(function() WEAPON.SET_CURRENT_PED_WEAPON(bgPed, weaponHash, true) end)
     safe(function() WEAPON.SET_PED_AMMO(bgPed, weaponHash, getWeapon().ammo) end)
-    safe(function() TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bgPed, 300.0, 0) end)
+    safe(function() TASK.CLEAR_PED_TASKS(bgPed) end)
+    safe(function() TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bgPed, 400.0, 0) end)
 end
 
 local function clearCombatAndResumeFollow(bgPed, playerPed, index, total)
@@ -805,6 +828,7 @@ Script.RegisterLooped("BetterBodyguards_AI", function()
     lastAiTick = now
 
     cleanBodyguards()
+    setupRelationshipGroups()
 
     local playerPed = PLAYER.PLAYER_PED_ID()
     if playerPed == 0 then
@@ -820,6 +844,7 @@ Script.RegisterLooped("BetterBodyguards_AI", function()
             applyBlip(bg)
 
             local weaponHash = MISC.GET_HASH_KEY(getWeapon().weapon)
+            safe(function() PED.SET_PED_RELATIONSHIP_GROUP_HASH(bg.ped, REL_GROUP_BODYGUARDS) end)
             safe(function() WEAPON.SET_CURRENT_PED_WEAPON(bg.ped, weaponHash, true) end)
             safe(function() WEAPON.SET_PED_AMMO(bg.ped, weaponHash, getWeapon().ammo) end)
 
@@ -1104,6 +1129,11 @@ ClickGUI.AddTab("Better Bodyguards", function()
         ClickGUI.EndCustomChildWindow()
     end
 end)
+
+dbg("Bodyguards vFinal loaded")
+dbg("Categories: 6 | Models: " .. tostring(#MODELS) .. " | Weapons: " .. tostring(#WEAPONS))
+setupRelationshipGroups()
+dbg("Feature init complete")
 
 info("Better Bodyguards chargé")
 info("AI Mode: " .. getAiMode())
