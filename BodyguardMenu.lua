@@ -5,6 +5,10 @@ local SCRIPT_NAME = "BetterBodyguards"
 local bodyguards = {}
 local lastAiTick = 0
 
+local REL_GROUP_BODYGUARDS = 0
+local REL_GROUP_COP = 0
+local REL_GROUP_PLAYER = 0
+
 local settings = {
     modelIndex = 1,
     weaponIndex = 4,
@@ -137,6 +141,27 @@ local function setToggleSilently(hash, state)
     end
 end
 
+local function setupRelationshipGroups()
+    if REL_GROUP_PLAYER == 0 then
+        REL_GROUP_PLAYER = MISC.GET_HASH_KEY("PLAYER")
+    end
+
+    if REL_GROUP_COP == 0 then
+        REL_GROUP_COP = MISC.GET_HASH_KEY("COP")
+    end
+
+    if REL_GROUP_BODYGUARDS == 0 then
+        REL_GROUP_BODYGUARDS = MISC.GET_HASH_KEY("BODYGUARDS_REL")
+    end
+
+    safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(0, REL_GROUP_BODYGUARDS, REL_GROUP_BODYGUARDS) end)
+    safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(0, REL_GROUP_BODYGUARDS, REL_GROUP_PLAYER) end)
+    safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(0, REL_GROUP_PLAYER, REL_GROUP_BODYGUARDS) end)
+
+    safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(5, REL_GROUP_BODYGUARDS, REL_GROUP_COP) end)
+    safe(function() PED.SET_RELATIONSHIP_BETWEEN_GROUPS(5, REL_GROUP_COP, REL_GROUP_BODYGUARDS) end)
+end
+
 local function loadModel(modelName)
     local hash = MISC.GET_HASH_KEY(modelName)
 
@@ -248,22 +273,6 @@ local function countBodyguards()
     return #bodyguards
 end
 
-local function setAsPlayerGroupMember(ped)
-    local playerPed = PLAYER.PLAYER_PED_ID()
-    if playerPed == 0 then
-        return
-    end
-
-    local group = safe(function()
-        return PED.GET_PED_GROUP_INDEX(playerPed)
-    end)
-
-    if group and group ~= 0 then
-        safe(function() PED.SET_PED_AS_GROUP_MEMBER(ped, group) end)
-        safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, true) end)
-    end
-end
-
 local function applyPedCombatStyle(ped)
     local mode = getAiMode()
 
@@ -272,8 +281,8 @@ local function applyPedCombatStyle(ped)
     safe(function() PED.SET_PED_ACCURACY(ped, settings.accuracy) end)
     safe(function() PED.SET_PED_ARMOUR(ped, settings.armour) end)
     safe(function() PED.SET_PED_FLEE_ATTRIBUTES(ped, 0, false) end)
-    safe(function() PED.SET_PED_SEEING_RANGE(ped, 300.0) end)
-    safe(function() PED.SET_PED_HEARING_RANGE(ped, 300.0) end)
+    safe(function() PED.SET_PED_SEEING_RANGE(ped, 500.0) end)
+    safe(function() PED.SET_PED_HEARING_RANGE(ped, 500.0) end)
     safe(function() PED.SET_PED_ALERTNESS(ped, 3) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 0, true) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 1, true) end)
@@ -283,6 +292,7 @@ local function applyPedCombatStyle(ped)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 13, true) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 20, true) end)
     safe(function() PED.SET_PED_COMBAT_ATTRIBUTES(ped, 46, true) end)
+    safe(function() PED.SET_PED_TARGET_LOSS_RESPONSE(ped, 1) end)
 
     if settings.godMode then
         safe(function() ENTITY.SET_ENTITY_INVINCIBLE(ped, true) end)
@@ -309,17 +319,20 @@ local function equipBodyguard(ped)
     local weapon = getWeapon()
     local weaponHash = MISC.GET_HASH_KEY(weapon.weapon)
 
+    setupRelationshipGroups()
+
     safe(function() WEAPON.REMOVE_ALL_PED_WEAPONS(ped, true) end)
     safe(function() WEAPON.GIVE_WEAPON_TO_PED(ped, weaponHash, weapon.ammo, false, true) end)
     safe(function() WEAPON.SET_PED_AMMO(ped, weaponHash, weapon.ammo) end)
     safe(function() WEAPON.SET_CURRENT_PED_WEAPON(ped, weaponHash, true) end)
 
+    safe(function() PED.SET_PED_RELATIONSHIP_GROUP_HASH(ped, REL_GROUP_BODYGUARDS) end)
     safe(function() PED.SET_PED_DROPS_WEAPONS_WHEN_DEAD(ped, false) end)
     safe(function() PED.SET_PED_CAN_SWITCH_WEAPON(ped, true) end)
     safe(function() PED.SET_PED_NEVER_LEAVES_GROUP(ped, true) end)
     safe(function() PED.SET_PED_SHOOT_RATE(ped, 1000) end)
+    safe(function() PED.SET_PED_AS_GROUP_MEMBER(ped, PED.GET_PED_GROUP_INDEX(PLAYER.PLAYER_PED_ID())) end)
 
-    setAsPlayerGroupMember(ped)
     applyPedCombatStyle(ped)
 end
 
@@ -718,145 +731,64 @@ local function reviveMissing()
     end
 end
 
-local function isBodyguardPed(ped)
-    for _, bg in ipairs(bodyguards) do
-        if bg and bg.ped == ped then
-            return true
-        end
-    end
-    return false
-end
+local function playerNeedsProtection(playerPed)
+    local wanted = safe(function()
+        return PLAYER.GET_PLAYER_WANTED_LEVEL(PLAYER.PLAYER_ID())
+    end) or 0
 
-local function isValidHostileTarget(targetPed, playerPed)
-    if not targetPed or targetPed == 0 then
-        return false
-    end
-
-    local exists = safe(function()
-        return ENTITY.DOES_ENTITY_EXIST(targetPed)
+    local inCombat = safe(function()
+        return PED.IS_PED_IN_COMBAT(playerPed, 0)
     end) or false
 
-    if not exists then
-        return false
-    end
-
-    if targetPed == playerPed then
-        return false
-    end
-
-    if isBodyguardPed(targetPed) then
-        return false
-    end
-
-    local dead = safe(function()
-        return ENTITY.GET_ENTITY_HEALTH(targetPed) <= 0
-    end) or true
-
-    if dead then
-        return false
-    end
-
-    local injured = safe(function()
-        return PED.IS_PED_INJURED(targetPed)
+    local beingArrested = safe(function()
+        return PLAYER.IS_PLAYER_BEING_ARRESTED(PLAYER.PLAYER_ID(), false)
     end) or false
 
-    if injured then
-        return false
-    end
-
-    local isPlayer = safe(function()
-        return PED.IS_PED_A_PLAYER(targetPed)
-    end) or false
-
-    if isPlayer then
-        return false
-    end
-
-    local isCop = safe(function()
-        return PED.IS_PED_COP(targetPed)
-    end) or false
-
-    local inCombatWithPlayer = safe(function()
-        return PED.IS_PED_IN_COMBAT(targetPed, playerPed)
-    end) or false
-
-    local shooting = safe(function()
-        return PED.IS_PED_SHOOTING(targetPed)
-    end) or false
-
-    local canSeePlayer = safe(function()
-        return ENTITY.HAS_ENTITY_CLEAR_LOS_TO_ENTITY(targetPed, playerPed, 17)
-    end) or false
-
-    if isCop then
+    if wanted > 0 then
         return true
     end
 
-    if inCombatWithPlayer then
+    if inCombat then
         return true
     end
 
-    if shooting and canSeePlayer then
+    if beingArrested then
         return true
     end
 
     return false
 end
 
-local function findNearestHostileForPlayer(playerPed, fromPed)
-    local myCoords = ENTITY.GET_ENTITY_COORDS(fromPed, true)
-    local bestTarget = 0
-    local bestDist = 999999999.0
-
-    for ped = 1, 256 do
-        local exists = safe(function()
-            return ENTITY.DOES_ENTITY_EXIST(ped)
-        end) or false
-
-        if exists and isValidHostileTarget(ped, playerPed) then
-            local coords = ENTITY.GET_ENTITY_COORDS(ped, true)
-            local dx = coords.x - myCoords.x
-            local dy = coords.y - myCoords.y
-            local dz = coords.z - myCoords.z
-            local dist = (dx * dx + dy * dy + dz * dz)
-
-            if dist < bestDist then
-                bestDist = dist
-                bestTarget = ped
-            end
-        end
+local function forceBodyguardCombat(bgPed)
+    if not bgPed or bgPed == 0 then
+        return
     end
 
-    return bestTarget
+    local weaponHash = MISC.GET_HASH_KEY(getWeapon().weapon)
+
+    safe(function() WEAPON.SET_CURRENT_PED_WEAPON(bgPed, weaponHash, true) end)
+    safe(function() WEAPON.SET_PED_AMMO(bgPed, weaponHash, getWeapon().ammo) end)
+    safe(function() TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bgPed, 300.0, 0) end)
 end
 
-local function engageTarget(bgPed, targetPed)
-    if not bgPed or bgPed == 0 or not targetPed or targetPed == 0 then
+local function clearCombatAndResumeFollow(bgPed, playerPed, index, total)
+    if not bgPed or bgPed == 0 then
         return
     end
 
     safe(function() TASK.CLEAR_PED_TASKS(bgPed) end)
-    safe(function() TASK.TASK_COMBAT_PED(bgPed, targetPed, 0, 16) end)
+
+    if settings.followPlayer then
+        hardFollowOne(bgPed, playerPed, index, total)
+    end
 end
 
 local function attackNearby()
-    local playerPed = PLAYER.PLAYER_PED_ID()
-    if playerPed == 0 then
-        return
-    end
-
     cleanBodyguards()
 
     for _, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
-            local target = findNearestHostileForPlayer(playerPed, bg.ped)
-            if target ~= 0 then
-                engageTarget(bg.ped, target)
-            else
-                safe(function()
-                    TASK.TASK_COMBAT_HATED_TARGETS_AROUND_PED(bg.ped, 120.0, 0)
-                end)
-            end
+            forceBodyguardCombat(bg.ped)
         end
     end
 end
@@ -867,7 +799,7 @@ Script.RegisterLooped("BetterBodyguards_AI", function()
     end
 
     local now = Time.GetEpocheMs()
-    if now - lastAiTick < 500 then
+    if now - lastAiTick < 700 then
         return
     end
     lastAiTick = now
@@ -880,6 +812,7 @@ Script.RegisterLooped("BetterBodyguards_AI", function()
     end
 
     local mode = getAiMode()
+    local protectNow = settings.protectPlayer and mode ~= "Neutral" and playerNeedsProtection(playerPed)
 
     for i, bg in ipairs(bodyguards) do
         if bg and bg.ped and ENTITY.DOES_ENTITY_EXIST(bg.ped) then
@@ -890,18 +823,10 @@ Script.RegisterLooped("BetterBodyguards_AI", function()
             safe(function() WEAPON.SET_CURRENT_PED_WEAPON(bg.ped, weaponHash, true) end)
             safe(function() WEAPON.SET_PED_AMMO(bg.ped, weaponHash, getWeapon().ammo) end)
 
-            local target = 0
-
-            if settings.protectPlayer and mode ~= "Neutral" then
-                target = findNearestHostileForPlayer(playerPed, bg.ped)
-            end
-
-            if target ~= 0 then
-                engageTarget(bg.ped, target)
+            if protectNow then
+                forceBodyguardCombat(bg.ped)
             else
-                if settings.followPlayer then
-                    hardFollowOne(bg.ped, playerPed, i, #bodyguards)
-                end
+                clearCombatAndResumeFollow(bg.ped, playerPed, i, #bodyguards)
             end
         end
     end
