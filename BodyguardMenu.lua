@@ -485,15 +485,7 @@ local function isHostilePed(targetPed, playerPed)
         return ENTITY.DOES_ENTITY_EXIST(targetPed)
     end) or false
 
-    if not exists then
-        return false
-    end
-
-    if targetPed == playerPed then
-        return false
-    end
-
-    if isBodyguardPed(targetPed) then
+    if not exists or targetPed == playerPed or isBodyguardPed(targetPed) then
         return false
     end
 
@@ -623,10 +615,6 @@ local function attackNearby()
 end
 
 local function spawnOneNow(offsetX, offsetY, offsetZ)
-    if ShouldUnload and ShouldUnload() then
-        return 0
-    end
-
     local playerPed = PLAYER.PLAYER_PED_ID()
     if playerPed == 0 then
         return 0
@@ -842,11 +830,7 @@ local function tpToVehicle()
     end
 end
 
-Script.RegisterLooped("BetterBodyguards_AI", function()
-    if ShouldUnload and ShouldUnload() then
-        return
-    end
-
+Script.RegisterLooped(function()
     local now = Time.GetEpocheMs()
     if now - lastAiTick < 700 then
         return
